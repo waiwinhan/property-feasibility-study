@@ -19,6 +19,9 @@ export default function ProjectOverview() {
   const qc = useQueryClient()
   const [showAddPhase, setShowAddPhase] = useState(false)
   const [phaseName, setPhaseName] = useState('')
+  const [editingName, setEditingName] = useState(false)
+  const [nameInput, setNameInput] = useState('')
+  const nameInputRef = useRef(null)
 
   const { data: project, isLoading: loadingProject } = useQuery({
     queryKey: ['project', id],
@@ -58,6 +61,18 @@ export default function ProjectOverview() {
     reorderPhases.mutate(items.map(p => p.id))
   }
 
+  function startEditName() {
+    setNameInput(project.name)
+    setEditingName(true)
+    setTimeout(() => { nameInputRef.current?.select() }, 0)
+  }
+
+  function saveNameEdit() {
+    const trimmed = nameInput.trim()
+    if (trimmed && trimmed !== project.name) updateProject.mutate({ name: trimmed })
+    setEditingName(false)
+  }
+
   if (loadingProject) return <div className="flex justify-center py-20"><Spinner className="w-8 h-8" /></div>
   if (!project) return <div className="text-center py-20 text-gray-500">Project not found.</div>
 
@@ -75,7 +90,30 @@ export default function ProjectOverview() {
       {/* Project Header */}
       <div className="flex flex-col sm:flex-row sm:items-start gap-4">
         <div className="flex-1 space-y-2">
-          <h1 className="text-2xl font-bold text-gray-900">{project.name}</h1>
+          <div className="flex items-center gap-2 group/name">
+            {editingName ? (
+              <input
+                ref={nameInputRef}
+                value={nameInput}
+                onChange={e => setNameInput(e.target.value)}
+                onBlur={saveNameEdit}
+                onKeyDown={e => { if (e.key === 'Enter') saveNameEdit(); if (e.key === 'Escape') setEditingName(false) }}
+                className="text-2xl font-bold text-gray-900 border-b-2 border-brand-500 focus:outline-none bg-transparent w-full max-w-lg"
+                autoFocus
+              />
+            ) : (
+              <>
+                <h1 className="text-2xl font-bold text-gray-900">{project.name}</h1>
+                <button
+                  onClick={startEditName}
+                  className="opacity-0 group-hover/name:opacity-100 p-1 text-gray-400 hover:text-gray-700 transition-all rounded"
+                  title="Rename project"
+                >
+                  <Pencil className="w-4 h-4" />
+                </button>
+              </>
+            )}
+          </div>
           {project.description && <p className="text-gray-500 text-sm">{project.description}</p>}
         </div>
         <div className="flex items-center gap-2 flex-wrap">

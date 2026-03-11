@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useQuery, useQueries, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { Plus, FolderOpen, TrendingUp, DollarSign, BarChart2, Search, Upload, Trash2, RotateCcw, ChevronDown, ChevronUp } from 'lucide-react'
+import { Plus, FolderOpen, TrendingUp, DollarSign, BarChart2, Search, Upload, Trash2, RotateCcw, ChevronDown, ChevronUp, Pencil } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, ReferenceLine } from 'recharts'
 import { projectsApi, phasesApi } from '../api/projects'
 import { formatRM, formatPct, statusColor, marginColor, cn } from '../lib/utils'
@@ -150,6 +150,10 @@ export default function PortfolioDashboard() {
     updateMut.mutate({ id, data })
   }
 
+  function handleRename(id, name) {
+    updateMut.mutate({ id, data: { name } })
+  }
+
   // Grouped view for "All" tab
   const groupedByStatus = STATUS_ORDER.map(status => ({
     status,
@@ -162,6 +166,7 @@ export default function PortfolioDashboard() {
     onDelete: () => setConfirmDeleteId(project.id),
     onStatusChange: handleStatusChange,
     onDateChange: handleDateChange,
+    onRename: handleRename,
   })
 
   return (
@@ -403,12 +408,23 @@ export default function PortfolioDashboard() {
   )
 }
 
-function ProjectCard({ project, onClick, onDelete, onStatusChange, onDateChange }) {
+function ProjectCard({ project, onClick, onDelete, onStatusChange, onDateChange, onRename }) {
   const margin = project.profit_margin_pct
+  const [editingName, setEditingName] = useState(false)
+  const [nameInput, setNameInput] = useState('')
+  const nameRef = useRef(null)
 
-  function fmtDate(d) {
-    if (!d) return ''
-    return new Date(d).toLocaleDateString('en-MY', { day: 'numeric', month: 'short', year: 'numeric' })
+  function startEdit(e) {
+    e.stopPropagation()
+    setNameInput(project.name)
+    setEditingName(true)
+    setTimeout(() => nameRef.current?.select(), 0)
+  }
+
+  function saveEdit() {
+    const trimmed = nameInput.trim()
+    if (trimmed && trimmed !== project.name) onRename(project.id, trimmed)
+    setEditingName(false)
   }
 
   return (
@@ -416,7 +432,27 @@ function ProjectCard({ project, onClick, onDelete, onStatusChange, onDateChange 
       <CardBody className="space-y-3">
         {/* Title row */}
         <div className="flex items-start justify-between gap-2">
-          <h3 className="font-semibold text-gray-900 leading-tight line-clamp-2 cursor-pointer" onClick={onClick}>{project.name}</h3>
+          <div className="flex-1 min-w-0 flex items-start gap-1 group/name">
+            {editingName ? (
+              <input
+                ref={nameRef}
+                value={nameInput}
+                onChange={e => setNameInput(e.target.value)}
+                onBlur={saveEdit}
+                onKeyDown={e => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') setEditingName(false) }}
+                onClick={e => e.stopPropagation()}
+                className="font-semibold text-gray-900 text-sm border-b border-brand-500 focus:outline-none bg-transparent w-full"
+                autoFocus
+              />
+            ) : (
+              <>
+                <h3 className="font-semibold text-gray-900 leading-tight line-clamp-2 cursor-pointer" onClick={onClick}>{project.name}</h3>
+                <button onClick={startEdit} className="opacity-0 group-hover/name:opacity-100 shrink-0 p-0.5 text-gray-400 hover:text-gray-700 transition-all rounded mt-0.5" title="Rename">
+                  <Pencil className="w-3 h-3" />
+                </button>
+              </>
+            )}
+          </div>
           <div className="flex items-center gap-1 shrink-0">
             <select
               value={project.status || 'Active'}
