@@ -8,6 +8,7 @@ export const projectsApi = {
   update: (id, data) => apiClient.patch(`/projects/${id}`, data).then(r => r.data),
   delete: (id) => apiClient.delete(`/projects/${id}`).then(r => r.data),
   restore: (id) => apiClient.post(`/projects/${id}/restore`).then(r => r.data),
+  permanentDelete: (id) => apiClient.delete(`/projects/${id}/permanent`).then(r => r.data),
   clone: (id) => apiClient.post(`/projects/${id}/clone`).then(r => r.data),
 }
 

@@ -108,6 +108,13 @@ router.post('/:id/restore', asyncHandler(async (req, res) => {
   res.json(data)
 }))
 
+// DELETE /api/projects/:id/permanent  — hard delete
+router.delete('/:id/permanent', asyncHandler(async (req, res) => {
+  const { error } = await supabase.from('projects').delete().eq('id', req.params.id)
+  if (error) throw error
+  res.status(204).end()
+}))
+
 // POST /api/projects/:id/clone
 router.post('/:id/clone', asyncHandler(async (req, res) => {
   const { data: src, error: e1 } = await supabase.from('projects').select('*').eq('id', req.params.id).single()

@@ -35,6 +35,7 @@ export default function PortfolioDashboard() {
   const [showImport, setShowImport] = useState(false)
   const [showDeleted, setShowDeleted] = useState(false)
   const [confirmDeleteId, setConfirmDeleteId] = useState(null)
+  const [confirmPermanentId, setConfirmPermanentId] = useState(null)
 
   const { data: projects = [], isLoading } = useQuery({
     queryKey: ['projects'],
@@ -65,6 +66,11 @@ export default function PortfolioDashboard() {
   const restoreMut = useMutation({
     mutationFn: projectsApi.restore,
     onSuccess: () => { qc.invalidateQueries(['projects']); qc.invalidateQueries(['projects-deleted']) },
+  })
+
+  const permanentDeleteMut = useMutation({
+    mutationFn: projectsApi.permanentDelete,
+    onSuccess: () => { qc.invalidateQueries(['projects-deleted']); setConfirmPermanentId(null) },
   })
 
   const filtered = projects
@@ -283,13 +289,22 @@ export default function PortfolioDashboard() {
                       Deleted {new Date(p.deleted_at).toLocaleDateString('en-MY', { day: 'numeric', month: 'short', year: 'numeric' })}
                     </p>
                   </div>
-                  <button
-                    onClick={() => restoreMut.mutate(p.id)}
-                    disabled={restoreMut.isPending}
-                    className="flex items-center gap-1.5 text-xs font-medium text-brand-600 hover:text-brand-800 border border-brand-200 hover:border-brand-400 rounded-lg px-3 py-1.5 transition-colors disabled:opacity-50"
-                  >
-                    <RotateCcw className="w-3.5 h-3.5" /> Restore
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => restoreMut.mutate(p.id)}
+                      disabled={restoreMut.isPending}
+                      className="flex items-center gap-1.5 text-xs font-medium text-brand-600 hover:text-brand-800 border border-brand-200 hover:border-brand-400 rounded-lg px-3 py-1.5 transition-colors disabled:opacity-50"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" /> Restore
+                    </button>
+                    <button
+                      onClick={() => setConfirmPermanentId(p.id)}
+                      className="flex items-center gap-1.5 text-xs font-medium text-red-600 hover:text-red-800 border border-red-200 hover:border-red-400 rounded-lg px-3 py-1.5 transition-colors"
+                      title="Delete forever"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" /> Delete Forever
+                    </button>
+                  </div>
                 </div>
               ))
             )}
@@ -307,6 +322,24 @@ export default function PortfolioDashboard() {
             <Button type="submit" disabled={!newName.trim() || createMut.isPending}>{createMut.isPending ? 'Creating…' : 'Create Project'}</Button>
           </div>
         </form>
+      </Modal>
+
+      <Modal open={!!confirmPermanentId} onClose={() => setConfirmPermanentId(null)} title="Delete Forever">
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600">
+            Permanently delete <strong>{deletedProjects.find(p => p.id === confirmPermanentId)?.name}</strong>? This cannot be undone — all phases, unit types, and cost data will be lost.
+          </p>
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary" onClick={() => setConfirmPermanentId(null)}>Cancel</Button>
+            <Button
+              className="bg-red-600 hover:bg-red-700 text-white"
+              onClick={() => permanentDeleteMut.mutate(confirmPermanentId)}
+              disabled={permanentDeleteMut.isPending}
+            >
+              {permanentDeleteMut.isPending ? 'Deleting…' : 'Delete Forever'}
+            </Button>
+          </div>
+        </div>
       </Modal>
 
       <Modal open={!!confirmDeleteId} onClose={() => setConfirmDeleteId(null)} title="Delete Project">
