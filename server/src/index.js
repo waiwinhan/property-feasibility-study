@@ -16,8 +16,9 @@ const PORT = process.env.PORT || 3001
 app.use(helmet({ contentSecurityPolicy: false }))
 app.use(compression())
 app.use(morgan('dev'))
+const allowedOrigin = (process.env.CLIENT_URL || 'http://localhost:5173').replace(/\/$/, '')
 app.use(cors({
-  origin: process.env.CLIENT_URL || 'http://localhost:5173',
+  origin: allowedOrigin,
   credentials: true,
 }))
 app.use(express.json({ limit: '5mb' }))
