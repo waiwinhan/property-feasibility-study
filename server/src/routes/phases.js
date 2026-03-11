@@ -13,7 +13,7 @@ router.get('/:id', asyncHandler(async (req, res) => {
 
 // PATCH /api/phases/:id
 router.patch('/:id', asyncHandler(async (req, res) => {
-  const allowed = ['name', 'dev_type', 'launch_date', 'land_area_acres', 'sort_order', 'is_active']
+  const allowed = ['name', 'dev_type', 'launch_date', 'vp_date', 'land_area_acres', 'sort_order', 'is_active', 'construction_start_date', 'construction_end_date']
   const updates = {}
   for (const k of allowed) if (req.body[k] !== undefined) updates[k] = req.body[k]
 

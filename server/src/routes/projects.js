@@ -160,14 +160,23 @@ router.get('/:id/phases', asyncHandler(async (req, res) => {
 
 // POST /api/projects/:id/phases
 router.post('/:id/phases', asyncHandler(async (req, res) => {
-  const { name, dev_type, launch_date } = req.body
+  const { name, dev_type, launch_date, vp_date, construction_start_date, construction_end_date } = req.body
   if (!name?.trim()) return res.status(400).json({ error: 'name is required' })
 
   const { count } = await supabase.from('phases').select('*', { count: 'exact', head: true }).eq('project_id', req.params.id)
 
   const { data: phase, error } = await supabase
     .from('phases')
-    .insert({ project_id: req.params.id, name: name.trim(), dev_type, launch_date, sort_order: count || 0 })
+    .insert({ 
+      project_id: req.params.id, 
+      name: name.trim(), 
+      dev_type, 
+      launch_date, 
+      vp_date,
+      construction_start_date,
+      construction_end_date,
+      sort_order: count || 0 
+    })
     .select().single()
   if (error) throw error
 

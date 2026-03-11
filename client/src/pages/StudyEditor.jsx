@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, ChevronRight, Save, Plus, Trash2, BarChart2, ChevronDown, ChevronUp, Monitor, Calculator } from 'lucide-react'
@@ -11,8 +11,14 @@ import { Card, CardHeader, CardBody } from '../components/ui/Card'
 import apiClient from '../api/client'
 
 const TABS = ['GDV', 'Costs']
-const CATEGORIES = ['Residential', 'Affordable', 'Commercial']
-const CATEGORY_COLORS = { Residential: 'text-blue-600 bg-blue-50', Affordable: 'text-emerald-600 bg-emerald-50', Commercial: 'text-amber-600 bg-amber-50' }
+const CATEGORIES = ['Residential', 'Affordable', 'Commercial - Serviced Apartment', 'Commercial - Shoplot/Retail']
+const CATEGORY_COLORS = { 
+  Residential: 'text-blue-600 bg-blue-50', 
+  Affordable: 'text-emerald-600 bg-emerald-50', 
+  'Commercial - Serviced Apartment': 'text-amber-600 bg-amber-50',
+  'Commercial - Shoplot/Retail': 'text-orange-600 bg-orange-50'
+ }
+const BUMI_APPLICABLE_CATEGORIES = ['Residential', 'Affordable', 'Commercial - Serviced Apartment']
 
 const DEFAULT_CA = {
   building_psf_residential: 300, building_psf_affordable: 200, building_psf_commercial: 180,
@@ -224,13 +230,31 @@ export default function StudyEditor() {
 function PhaseHeader({ phase, onSave, readOnly, saveRef }) {
   const [devType, setDevType] = useState(phase?.dev_type || '')
   const [launchDate, setLaunchDate] = useState(phase?.launch_date || '')
+  const [vpDate, setVpDate] = useState(phase?.vp_date || '')
   const [landArea, setLandArea] = useState(phase?.land_area_acres ?? '')
+  const [constructionStart, setConstructionStart] = useState(phase?.construction_start_date || '')
+  const [constructionEnd, setConstructionEnd] = useState(phase?.construction_end_date || '')
+
+  // Calculate months between two dates
+  const calculateMonths = (start, end) => {
+    if (!start || !end) return null
+    const startDate = new Date(start)
+    const endDate = new Date(end)
+    const months = (endDate.getFullYear() - startDate.getFullYear()) * 12 + (endDate.getMonth() - startDate.getMonth())
+    return months > 0 ? months : 0
+  }
+
+  const monthsToDeliver = calculateMonths(launchDate, vpDate)
+  const constructionMonths = calculateMonths(constructionStart, constructionEnd)
 
   // Sync when phase changes
   useEffect(() => {
     setDevType(phase?.dev_type || '')
     setLaunchDate(phase?.launch_date || '')
+    setVpDate(phase?.vp_date || '')
     setLandArea(phase?.land_area_acres ?? '')
+    setConstructionStart(phase?.construction_start_date || '')
+    setConstructionEnd(phase?.construction_end_date || '')
   }, [phase?.id])
 
   // Expose save function to parent
@@ -239,7 +263,10 @@ function PhaseHeader({ phase, onSave, readOnly, saveRef }) {
       saveRef.current = () => onSave({
         dev_type: devType,
         launch_date: launchDate || null,
+        vp_date: vpDate || null,
         land_area_acres: parseFloat(landArea) || null,
+        construction_start_date: constructionStart || null,
+        construction_end_date: constructionEnd || null,
       })
     }
   })
@@ -247,7 +274,7 @@ function PhaseHeader({ phase, onSave, readOnly, saveRef }) {
   return (
     <div className="mb-5 pb-4 border-b border-gray-100">
       <h2 className="text-lg font-semibold text-gray-900 mb-3">{phase?.name}</h2>
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div>
           <label className="text-xs font-medium text-gray-500 block mb-1">Development Type</label>
           <select
@@ -258,7 +285,7 @@ function PhaseHeader({ phase, onSave, readOnly, saveRef }) {
           >
             <option value="">Select type...</option>
             <option value="Residential">Residential</option>
-            <option value="Commercial">Commercial</option>
+            <option value="Affordable">Affordable</option>
             <option value="Mixed Development">Mixed Development</option>
           </select>
         </div>
@@ -273,6 +300,22 @@ function PhaseHeader({ phase, onSave, readOnly, saveRef }) {
           />
         </div>
         <div>
+          <label className="text-xs font-medium text-gray-500 block mb-1">VP Date</label>
+          <input
+            type="date"
+            className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-brand-500 disabled:bg-gray-50 disabled:text-gray-500"
+            value={vpDate}
+            disabled={readOnly}
+            onChange={e => setVpDate(e.target.value)}
+          />
+        </div>
+        <div>
+          <label className="text-xs font-medium text-gray-500 block mb-1">Months to Deliver</label>
+          <div className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm bg-gray-50 text-gray-700">
+            {monthsToDeliver !== null ? `${monthsToDeliver} months` : '—'}
+          </div>
+        </div>
+        <div>
           <label className="text-xs font-medium text-gray-500 block mb-1">Land Area (acres)</label>
           <input
             type="number" min="0" step="0.01"
@@ -283,12 +326,62 @@ function PhaseHeader({ phase, onSave, readOnly, saveRef }) {
             onChange={e => setLandArea(e.target.value)}
           />
         </div>
+        <div>
+          <label className="text-xs font-medium text-gray-500 block mb-1">Construction Start</label>
+          <input
+            type="date"
+            className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-brand-500 disabled:bg-gray-50 disabled:text-gray-500"
+            value={constructionStart}
+            disabled={readOnly}
+            onChange={e => setConstructionStart(e.target.value)}
+          />
+        </div>
+        <div>
+          <label className="text-xs font-medium text-gray-500 block mb-1">Construction End</label>
+          <input
+            type="date"
+            className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-brand-500 disabled:bg-gray-50 disabled:text-gray-500"
+            value={constructionEnd}
+            disabled={readOnly}
+            onChange={e => setConstructionEnd(e.target.value)}
+          />
+        </div>
+        <div>
+          <label className="text-xs font-medium text-gray-500 block mb-1">Construction Months</label>
+          <div className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm bg-gray-50 text-gray-700">
+            {constructionMonths !== null ? `${constructionMonths} months` : '—'}
+          </div>
+        </div>
       </div>
     </div>
   )
 }
 
 function GDVTab({ unitRows, setUnitRow, addRow, removeRow, caForm, setCaField, readOnly }) {
+  const hasBumiApplicableUnits = unitRows.some(row => BUMI_APPLICABLE_CATEGORIES.includes(row.category))
+  
+  // Group rows by category
+  const rowsByCategory = CATEGORIES.reduce((acc, cat) => {
+    acc[cat] = unitRows.filter((row, idx) => row.category === cat)
+    return acc
+  }, {})
+  
+  // Calculate subtotals for each category
+  const calculateSubtotal = (rows) => {
+    return rows.reduce((acc, row) => {
+      const units = parseInt(row.unit_count) || 0
+      const size = parseFloat(row.avg_size_sqft) || 0
+      const psf = parseFloat(row.selling_psf) || 0
+      acc.units += units
+      acc.netArea += units * size
+      acc.gdv += units * size * psf
+      return acc
+    }, { units: 0, netArea: 0, gdv: 0 })
+  }
+  
+  // Calculate grand total
+  const grandTotal = calculateSubtotal(unitRows)
+  
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -300,86 +393,103 @@ function GDVTab({ unitRows, setUnitRow, addRow, removeRow, caForm, setCaField, r
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-200">
-              <th className="px-3 py-2.5 text-left font-medium text-gray-600 w-40">Unit Type</th>
-              <th className="px-3 py-2.5 text-left font-medium text-gray-600 w-32">Category</th>
+              <th className="px-3 py-2.5 text-left font-medium text-gray-600 min-w-[140px]">Unit Type</th>
+              <th className="px-3 py-2.5 text-left font-medium text-gray-600 min-w-[180px]">Category</th>
               <th className="px-3 py-2.5 text-right font-medium text-gray-600 w-24">Units</th>
               <th className="px-3 py-2.5 text-right font-medium text-gray-600 w-28">Size (sqft)</th>
-              <th className="px-3 py-2.5 text-right font-medium text-gray-600 w-32">Selling PSF (RM)</th>
-              <th className="px-3 py-2.5 text-right font-medium text-gray-600 w-32">GDV</th>
+              <th className="px-3 py-2.5 text-right font-medium text-gray-600 w-36">Selling PSF (RM)</th>
+              <th className="px-3 py-2.5 text-right font-medium text-gray-600 w-40">GDV</th>
               <th className="px-2 py-2.5 w-8"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {unitRows.map((row, idx) => {
-              const gdv = (parseInt(row.unit_count) || 0) * (parseFloat(row.avg_size_sqft) || 0) * (parseFloat(row.selling_psf) || 0)
+            {CATEGORIES.map(cat => {
+              const catRows = rowsByCategory[cat]
+              if (catRows.length === 0) return null
+              
+              const subtotal = calculateSubtotal(catRows)
+              
               return (
-                <tr key={idx} className="hover:bg-gray-50 group">
-                  <td className="px-3 py-2">
-                    <input
-                      className="w-full bg-transparent border-0 focus:outline-none focus:ring-1 focus:ring-brand-500 rounded px-1 py-0.5 disabled:cursor-default"
-                      value={row.name}
-                      disabled={readOnly}
-                      onChange={e => setUnitRow(idx, 'name', e.target.value)}
-                      placeholder="e.g. 3-Sty Superlink"
-                    />
-                  </td>
-                  <td className="px-3 py-2">
-                    <select
-                      className="w-full bg-transparent border-0 focus:outline-none text-sm disabled:cursor-default"
-                      value={row.category}
-                      disabled={readOnly}
-                      onChange={e => setUnitRow(idx, 'category', e.target.value)}
-                    >
-                      {CATEGORIES.map(c => <option key={c}>{c}</option>)}
-                    </select>
-                  </td>
-                  <td className="px-3 py-2">
-                    <input type="number" min="0"
-                      className="w-full bg-transparent border-0 focus:outline-none text-right focus:ring-1 focus:ring-brand-500 rounded px-1 py-0.5 disabled:cursor-default"
-                      value={row.unit_count} disabled={readOnly} onChange={e => setUnitRow(idx, 'unit_count', e.target.value)} placeholder="0"
-                    />
-                  </td>
-                  <td className="px-3 py-2">
-                    <input type="number" min="0" step="any"
-                      className="w-full bg-transparent border-0 focus:outline-none text-right focus:ring-1 focus:ring-brand-500 rounded px-1 py-0.5 disabled:cursor-default"
-                      value={row.avg_size_sqft} disabled={readOnly} onChange={e => setUnitRow(idx, 'avg_size_sqft', e.target.value)} placeholder="0"
-                    />
-                  </td>
-                  <td className="px-3 py-2">
-                    <div className="flex items-center justify-end gap-0.5">
-                      <span className="text-xs text-gray-400 shrink-0">RM</span>
-                      <input type="number" min="0" step="any"
-                        className="w-full bg-transparent border-0 focus:outline-none text-right focus:ring-1 focus:ring-brand-500 rounded px-1 py-0.5 disabled:cursor-default"
-                        value={row.selling_psf} disabled={readOnly} onChange={e => setUnitRow(idx, 'selling_psf', e.target.value)} placeholder="0"
-                      />
-                    </div>
-                  </td>
-                  <td className="px-3 py-2 text-right text-gray-600 font-medium">
-                    {gdv > 0 ? formatRM(gdv, true) : '—'}
-                  </td>
-                  <td className="px-2 py-2">
-                    {!readOnly && (
-                      <button onClick={() => removeRow(idx)} className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 p-0.5">
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    )}
-                  </td>
-                </tr>
+                <React.Fragment key={`cat-${cat}`}>
+                  {catRows.map((row, idx) => {
+                    const rowIndex = unitRows.indexOf(row)
+                    const gdv = (parseInt(row.unit_count) || 0) * (parseFloat(row.avg_size_sqft) || 0) * (parseFloat(row.selling_psf) || 0)
+                    return (
+                      <tr key={`${cat}-${idx}`} className="hover:bg-gray-50 group">
+                        <td className="px-3 py-2">
+                          <input
+                            className="w-full bg-transparent border-0 focus:outline-none focus:ring-1 focus:ring-brand-500 rounded px-1 py-0.5 disabled:cursor-default"
+                            value={row.name}
+                            disabled={readOnly}
+                            onChange={e => setUnitRow(rowIndex, 'name', e.target.value)}
+                            placeholder="e.g. 3-Sty Superlink"
+                          />
+                        </td>
+                        <td className="px-3 py-2">
+                          <select
+                            className="w-full min-w-[160px] bg-transparent border-0 focus:outline-none text-sm disabled:cursor-default truncate"
+                            value={row.category}
+                            disabled={readOnly}
+                            onChange={e => setUnitRow(rowIndex, 'category', e.target.value)}
+                            title={row.category}
+                          >
+                            {CATEGORIES.map(c => <option key={c}>{c}</option>)}
+                          </select>
+                        </td>
+                        <td className="px-3 py-2">
+                          <input type="number" min="0"
+                            className="w-full bg-transparent border-0 focus:outline-none text-right focus:ring-1 focus:ring-brand-500 rounded px-1 py-0.5 disabled:cursor-default"
+                            value={row.unit_count} disabled={readOnly} onChange={e => setUnitRow(rowIndex, 'unit_count', e.target.value)} placeholder="0"
+                          />
+                        </td>
+                        <td className="px-3 py-2">
+                          <input type="number" min="0" step="any"
+                            className="w-full bg-transparent border-0 focus:outline-none text-right focus:ring-1 focus:ring-brand-500 rounded px-1 py-0.5 disabled:cursor-default"
+                            value={row.avg_size_sqft} disabled={readOnly} onChange={e => setUnitRow(rowIndex, 'avg_size_sqft', e.target.value)} placeholder="0"
+                          />
+                        </td>
+                        <td className="px-3 py-2">
+                          <div className="flex items-center justify-end gap-0.5">
+                            <span className="text-xs text-gray-400 shrink-0">RM</span>
+                            <input type="number" min="0" step="any"
+                              className="w-full bg-transparent border-0 focus:outline-none text-right focus:ring-1 focus:ring-brand-500 rounded px-1 py-0.5 disabled:cursor-default"
+                              value={row.selling_psf} disabled={readOnly} onChange={e => setUnitRow(rowIndex, 'selling_psf', e.target.value)} placeholder="0"
+                            />
+                          </div>
+                        </td>
+                        <td className="px-3 py-2 text-right text-gray-600 font-medium whitespace-nowrap">
+                          {gdv > 0 ? formatRM(gdv) : '—'}
+                        </td>
+                        <td className="px-2 py-2">
+                          {!readOnly && (
+                            <button onClick={() => removeRow(rowIndex)} className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 p-0.5">
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                  {/* Subtotal row for this category */}
+                  <tr className="bg-gray-50 border-t border-gray-200">
+                    <td colSpan={2} className="px-3 py-2 text-sm font-semibold text-gray-600">{cat} Subtotal</td>
+                    <td className="px-3 py-2 text-right text-sm font-semibold text-gray-700">{subtotal.units.toLocaleString()}</td>
+                    <td className="px-3 py-2 text-right text-sm font-semibold text-gray-700">{subtotal.netArea.toLocaleString()}</td>
+                    <td></td>
+                    <td className="px-3 py-2 text-right text-sm font-bold text-gray-800 whitespace-nowrap">{formatRM(subtotal.gdv)}</td>
+                    <td></td>
+                  </tr>
+                </React.Fragment>
               )
             })}
           </tbody>
           <tfoot>
-            <tr className="bg-gray-50 border-t-2 border-gray-300">
-              <td colSpan={2} className="px-3 py-2.5 text-sm font-semibold text-gray-700">Total</td>
-              <td className="px-3 py-2.5 text-right text-sm font-semibold">
-                {unitRows.reduce((s, r) => s + (parseInt(r.unit_count) || 0), 0)}
-              </td>
-              <td colSpan={2}></td>
-              <td className="px-3 py-2.5 text-right text-sm font-bold text-gray-900">
-                {formatRM(unitRows.reduce((s, r) =>
-                  s + (parseInt(r.unit_count) || 0) * (parseFloat(r.avg_size_sqft) || 0) * (parseFloat(r.selling_psf) || 0), 0
-                ), true)}
-              </td>
+            <tr className="bg-gray-100 border-t-2 border-gray-300">
+              <td colSpan={2} className="px-3 py-2.5 text-sm font-bold text-gray-900">Grand Total</td>
+              <td className="px-3 py-2.5 text-right text-sm font-bold text-gray-900">{grandTotal.units.toLocaleString()}</td>
+              <td className="px-3 py-2.5 text-right text-sm font-bold text-gray-900">{grandTotal.netArea.toLocaleString()}</td>
+              <td></td>
+              <td className="px-3 py-2.5 text-right text-sm font-bold text-gray-900 whitespace-nowrap">{formatRM(grandTotal.gdv)}</td>
               <td></td>
             </tr>
           </tfoot>
@@ -391,10 +501,12 @@ function GDVTab({ unitRows, setUnitRow, addRow, removeRow, caForm, setCaField, r
         <div className="px-4 py-3 bg-gray-50 text-sm font-semibold text-gray-700 border-b border-gray-200">GDV Deductions</div>
         <div className="px-4 py-1">
           {[
-            { label: 'Bumi Quota %', field: 'bumi_quota_pct' },
-            { label: 'Bumi Discount %', field: 'bumi_discount_pct' },
+            ...hasBumiApplicableUnits ? [
+              { label: 'Bumi Quota %', field: 'bumi_quota_pct' },
+              { label: 'Bumi Discount %', field: 'bumi_discount_pct' },
+            ] : [],
             { label: 'Legal Fees %', field: 'legal_fees_pct' },
-            { label: 'Early Bird Discount %', field: 'early_bird_pct' },
+            { label: 'Discount / Rebate %', field: 'early_bird_pct' },
           ].map(({ label, field }) => (
             <div key={field} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
               <label className="text-sm text-gray-600">{label}</label>
@@ -475,7 +587,7 @@ function CostsTab({ caForm, setCaField, projectId, readOnly }) {
             {pools.map(pool => (
               <div key={pool.id} className="flex items-center justify-between py-1.5 text-sm">
                 <span className="text-gray-700">{pool.name}</span>
-                <span className="font-medium text-gray-900">{formatRM(pool.pool_total, true)}</span>
+                <span className="font-medium text-gray-900">{formatRM(pool.pool_total)}</span>
               </div>
             ))}
             <div className="flex items-center justify-between py-1.5 text-sm font-semibold">
@@ -561,10 +673,10 @@ function TotalTab({ phases }) {
   const blendedMargin = totals.ndv > 0 ? (totals.ndp / totals.ndv) * 100 : null
 
   const kpis = [
-    { label: 'Total GDV', value: formatRM(totals.gdv, true) },
-    { label: 'Total NDV', value: formatRM(totals.ndv, true) },
-    { label: 'Total GCC', value: formatRM(totals.gcc, true) },
-    { label: 'Total NDP', value: formatRM(totals.ndp, true) },
+    { label: 'Total GDV', value: formatRM(totals.gdv) },
+    { label: 'Total NDV', value: formatRM(totals.ndv) },
+    { label: 'Total GCC', value: formatRM(totals.gcc) },
+    { label: 'Total NDP', value: formatRM(totals.ndp) },
     { label: 'Blended Margin', value: formatPct(blendedMargin), color: marginColor(blendedMargin) },
     { label: 'Total Units', value: totals.units },
   ]
@@ -617,10 +729,10 @@ function TotalTab({ phases }) {
               <tr key={p.id} className="hover:bg-gray-50">
                 <td className="px-4 py-2.5 font-medium text-gray-900">{p.name}</td>
                 <td className="px-4 py-2.5 text-right text-gray-600">{p.unit_count ?? '—'}</td>
-                <td className="px-4 py-2.5 text-right text-gray-600">{formatRM(p.total_gdv, true)}</td>
-                <td className="px-4 py-2.5 text-right text-gray-600">{formatRM(p.total_ndv, true)}</td>
-                <td className="px-4 py-2.5 text-right text-gray-600">{formatRM(p.total_gcc, true)}</td>
-                <td className="px-4 py-2.5 text-right font-medium text-gray-900">{formatRM(p.total_ndp, true)}</td>
+                <td className="px-4 py-2.5 text-right text-gray-600">{formatRM(p.total_gdv)}</td>
+                <td className="px-4 py-2.5 text-right text-gray-600">{formatRM(p.total_ndv)}</td>
+                <td className="px-4 py-2.5 text-right text-gray-600">{formatRM(p.total_gcc)}</td>
+                <td className="px-4 py-2.5 text-right font-medium text-gray-900">{formatRM(p.total_ndp)}</td>
                 <td className="px-4 py-2.5 text-right">
                   <span className={cn('font-semibold', marginColor(p.profit_margin_pct))}>{formatPct(p.profit_margin_pct)}</span>
                 </td>
@@ -631,10 +743,10 @@ function TotalTab({ phases }) {
             <tr className="border-t-2 border-gray-300 bg-gray-50 font-semibold">
               <td className="px-4 py-2.5 text-gray-900">Total</td>
               <td className="px-4 py-2.5 text-right">{totals.units}</td>
-              <td className="px-4 py-2.5 text-right">{formatRM(totals.gdv, true)}</td>
-              <td className="px-4 py-2.5 text-right">{formatRM(totals.ndv, true)}</td>
-              <td className="px-4 py-2.5 text-right">{formatRM(totals.gcc, true)}</td>
-              <td className="px-4 py-2.5 text-right font-bold">{formatRM(totals.ndp, true)}</td>
+              <td className="px-4 py-2.5 text-right">{formatRM(totals.gdv)}</td>
+              <td className="px-4 py-2.5 text-right">{formatRM(totals.ndv)}</td>
+              <td className="px-4 py-2.5 text-right">{formatRM(totals.gcc)}</td>
+              <td className="px-4 py-2.5 text-right font-bold">{formatRM(totals.ndp)}</td>
               <td className="px-4 py-2.5 text-right">
                 <span className={cn('font-bold text-base', marginColor(blendedMargin))}>{formatPct(blendedMargin)}</span>
               </td>
@@ -661,7 +773,7 @@ function FinancialSummary({ results }) {
     { label: 'GDV', value: r.gdv, highlight: false },
     { label: 'Bumi Deduction', value: r.ndvResult?.bumiDeduction, neg: true },
     { label: 'Legal Fees', value: r.ndvResult?.legalFees, neg: true },
-    { label: 'Early Bird', value: r.ndvResult?.earlyBird, neg: true },
+    { label: 'Discount / Rebate', value: r.ndvResult?.earlyBird, neg: true },
     { label: 'NDV', value: r.ndv, highlight: true, bold: true, divider: true },
     { label: 'Land Cost', value: r.landResult?.totalLand, neg: true },
     { label: 'GCC', value: r.gcc, neg: true },
@@ -682,8 +794,8 @@ function FinancialSummary({ results }) {
       {/* Key KPIs */}
       <div className="grid grid-cols-2 gap-2 mb-4">
         {[
-          { label: 'NDV', value: formatRM(r.ndv, true) },
-          { label: 'NDP', value: formatRM(r.ndp, true) },
+          { label: 'NDV', value: formatRM(r.ndv) },
+          { label: 'NDP', value: formatRM(r.ndp) },
           { label: 'Margin', value: formatPct(margin), color: marginColor(margin) },
           { label: 'Const PSF', value: formatPSF(r.constPsf) },
           { label: 'Units', value: r.totalUnits },
@@ -705,7 +817,7 @@ function FinancialSummary({ results }) {
               bold ? 'font-bold' : 'font-medium',
               highlight ? (margin >= 15 ? 'text-green-600' : margin >= 12 ? 'text-amber-500' : 'text-red-600') : neg ? 'text-gray-600' : 'text-gray-900'
             )}>
-              {value != null ? formatRM(value, true) : '—'}
+              {value != null ? formatRM(value) : '—'}
             </span>
           </div>
         ))}
