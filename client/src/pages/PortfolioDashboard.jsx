@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useQueries, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { Plus, FolderOpen, TrendingUp, DollarSign, BarChart2, Search, Upload } from 'lucide-react'
+import { Plus, FolderOpen, TrendingUp, DollarSign, BarChart2, Search, Upload, Trash2, RotateCcw, ChevronDown, ChevronUp } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, ReferenceLine } from 'recharts'
 import { projectsApi, phasesApi } from '../api/projects'
 import { formatRM, formatPct, statusColor, marginColor, cn } from '../lib/utils'
@@ -33,10 +33,18 @@ export default function PortfolioDashboard() {
   const [showNew, setShowNew] = useState(false)
   const [newName, setNewName] = useState('')
   const [showImport, setShowImport] = useState(false)
+  const [showDeleted, setShowDeleted] = useState(false)
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null)
 
   const { data: projects = [], isLoading } = useQuery({
     queryKey: ['projects'],
     queryFn: projectsApi.list,
+  })
+
+  const { data: deletedProjects = [] } = useQuery({
+    queryKey: ['projects-deleted'],
+    queryFn: projectsApi.listDeleted,
+    enabled: showDeleted,
   })
 
   const createMut = useMutation({
@@ -47,6 +55,16 @@ export default function PortfolioDashboard() {
       setNewName('')
       navigate(`/project/${proj.id}`)
     },
+  })
+
+  const deleteMut = useMutation({
+    mutationFn: projectsApi.delete,
+    onSuccess: () => { qc.invalidateQueries(['projects']); qc.invalidateQueries(['projects-deleted']); setConfirmDeleteId(null) },
+  })
+
+  const restoreMut = useMutation({
+    mutationFn: projectsApi.restore,
+    onSuccess: () => { qc.invalidateQueries(['projects']); qc.invalidateQueries(['projects-deleted']) },
   })
 
   const filtered = projects
@@ -226,9 +244,58 @@ export default function PortfolioDashboard() {
           action={projects.length === 0 && <Button onClick={() => setShowNew(true)}><Plus className="w-4 h-4" /> New Project</Button>} />
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {filtered.map(project => <ProjectCard key={project.id} project={project} onClick={() => navigate(`/project/${project.id}`)} />)}
+          {filtered.map(project => (
+            <ProjectCard
+              key={project.id}
+              project={project}
+              onClick={() => navigate(`/project/${project.id}`)}
+              onDelete={() => setConfirmDeleteId(project.id)}
+            />
+          ))}
         </div>
       )}
+
+      {/* Deleted Projects */}
+      <div className="border border-gray-200 rounded-xl overflow-hidden">
+        <button
+          onClick={() => setShowDeleted(v => !v)}
+          className="w-full flex items-center justify-between px-5 py-3.5 bg-gray-50 hover:bg-gray-100 text-sm font-medium text-gray-600 transition-colors"
+        >
+          <span className="flex items-center gap-2">
+            <Trash2 className="w-4 h-4 text-gray-400" />
+            Deleted Projects
+            {deletedProjects.length > 0 && (
+              <span className="bg-gray-200 text-gray-600 text-xs rounded-full px-2 py-0.5">{deletedProjects.length}</span>
+            )}
+          </span>
+          {showDeleted ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+        </button>
+        {showDeleted && (
+          <div className="divide-y divide-gray-100">
+            {deletedProjects.length === 0 ? (
+              <p className="px-5 py-4 text-sm text-gray-400 italic">No deleted projects.</p>
+            ) : (
+              deletedProjects.map(p => (
+                <div key={p.id} className="flex items-center justify-between px-5 py-3 hover:bg-gray-50">
+                  <div>
+                    <p className="text-sm font-medium text-gray-700">{p.name}</p>
+                    <p className="text-xs text-gray-400">
+                      Deleted {new Date(p.deleted_at).toLocaleDateString('en-MY', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => restoreMut.mutate(p.id)}
+                    disabled={restoreMut.isPending}
+                    className="flex items-center gap-1.5 text-xs font-medium text-brand-600 hover:text-brand-800 border border-brand-200 hover:border-brand-400 rounded-lg px-3 py-1.5 transition-colors disabled:opacity-50"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" /> Restore
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+      </div>
 
       <ImportModal open={showImport} onClose={() => setShowImport(false)} />
 
@@ -241,27 +308,54 @@ export default function PortfolioDashboard() {
           </div>
         </form>
       </Modal>
+
+      <Modal open={!!confirmDeleteId} onClose={() => setConfirmDeleteId(null)} title="Delete Project">
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600">
+            Move <strong>{projects.find(p => p.id === confirmDeleteId)?.name}</strong> to deleted projects? You can restore it later.
+          </p>
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary" onClick={() => setConfirmDeleteId(null)}>Cancel</Button>
+            <Button
+              className="bg-red-600 hover:bg-red-700 text-white"
+              onClick={() => deleteMut.mutate(confirmDeleteId)}
+              disabled={deleteMut.isPending}
+            >
+              {deleteMut.isPending ? 'Deleting…' : 'Delete'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   )
 }
 
-function ProjectCard({ project, onClick }) {
+function ProjectCard({ project, onClick, onDelete }) {
   const margin = project.profit_margin_pct
   return (
-    <Card className="cursor-pointer hover:shadow-md hover:border-brand-200 transition-all" onClick={onClick}>
+    <Card className="hover:shadow-md hover:border-brand-200 transition-all group">
       <CardBody className="space-y-3">
         <div className="flex items-start justify-between gap-2">
-          <h3 className="font-semibold text-gray-900 leading-tight line-clamp-2">{project.name}</h3>
-          <Badge className={statusColor(project.status)}>{project.status}</Badge>
+          <h3 className="font-semibold text-gray-900 leading-tight line-clamp-2 cursor-pointer" onClick={onClick}>{project.name}</h3>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <Badge className={statusColor(project.status)}>{project.status}</Badge>
+            <button
+              onClick={e => { e.stopPropagation(); onDelete() }}
+              className="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-red-500 transition-all rounded"
+              title="Delete project"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
-        <div className="grid grid-cols-2 gap-y-2 text-sm">
+        <div className="grid grid-cols-2 gap-y-2 text-sm cursor-pointer" onClick={onClick}>
           <div><p className="text-gray-500 text-xs">GDV</p><p className="font-medium">{formatRM(project.total_gdv, true)}</p></div>
           <div><p className="text-gray-500 text-xs">NDP</p><p className="font-medium">{formatRM(project.total_ndp, true)}</p></div>
           <div><p className="text-gray-500 text-xs">Margin</p><p className={cn('font-semibold', marginColor(margin))}>{formatPct(margin)}</p></div>
           <div><p className="text-gray-500 text-xs">Phases</p><p className="font-medium">{project.phase_count || 0}</p></div>
         </div>
         {project.updated_at && (
-          <p className="text-xs text-gray-400">Updated {new Date(project.updated_at).toLocaleDateString('en-MY', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+          <p className="text-xs text-gray-400 cursor-pointer" onClick={onClick}>Updated {new Date(project.updated_at).toLocaleDateString('en-MY', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
         )}
       </CardBody>
     </Card>

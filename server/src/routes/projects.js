@@ -9,6 +9,7 @@ router.get('/', asyncHandler(async (req, res) => {
   const { data: projects, error } = await supabase
     .from('projects')
     .select('*, phases(id, name, total_ndv, total_gdv, total_ndp, profit_margin_pct, unit_count)')
+    .is('deleted_at', null)
     .order('created_at', { ascending: false })
 
   if (error) throw error
@@ -30,6 +31,17 @@ router.get('/', asyncHandler(async (req, res) => {
   })
 
   res.json(enriched)
+}))
+
+// GET /api/projects/deleted  — must be before /:id
+router.get('/deleted', asyncHandler(async (req, res) => {
+  const { data: projects, error } = await supabase
+    .from('projects')
+    .select('id, name, status, deleted_at, created_at')
+    .not('deleted_at', 'is', null)
+    .order('deleted_at', { ascending: false })
+  if (error) throw error
+  res.json(projects || [])
 }))
 
 // GET /api/projects/:id
@@ -74,11 +86,26 @@ router.patch('/:id', asyncHandler(async (req, res) => {
   res.json(data)
 }))
 
-// DELETE /api/projects/:id
+// DELETE /api/projects/:id  — soft delete
 router.delete('/:id', asyncHandler(async (req, res) => {
-  const { error } = await supabase.from('projects').delete().eq('id', req.params.id)
+  const { error } = await supabase
+    .from('projects')
+    .update({ deleted_at: new Date().toISOString() })
+    .eq('id', req.params.id)
   if (error) throw error
   res.status(204).end()
+}))
+
+// POST /api/projects/:id/restore
+router.post('/:id/restore', asyncHandler(async (req, res) => {
+  const { data, error } = await supabase
+    .from('projects')
+    .update({ deleted_at: null })
+    .eq('id', req.params.id)
+    .select()
+    .single()
+  if (error) throw error
+  res.json(data)
 }))
 
 // POST /api/projects/:id/clone

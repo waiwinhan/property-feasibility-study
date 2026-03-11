@@ -2,10 +2,12 @@ import apiClient from './client'
 
 export const projectsApi = {
   list: () => apiClient.get('/projects').then(r => r.data),
+  listDeleted: () => apiClient.get('/projects/deleted').then(r => r.data),
   get: (id) => apiClient.get(`/projects/${id}`).then(r => r.data),
   create: (data) => apiClient.post('/projects', data).then(r => r.data),
   update: (id, data) => apiClient.patch(`/projects/${id}`, data).then(r => r.data),
   delete: (id) => apiClient.delete(`/projects/${id}`).then(r => r.data),
+  restore: (id) => apiClient.post(`/projects/${id}/restore`).then(r => r.data),
   clone: (id) => apiClient.post(`/projects/${id}/clone`).then(r => r.data),
 }
 
