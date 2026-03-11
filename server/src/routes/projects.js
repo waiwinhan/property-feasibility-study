@@ -72,7 +72,7 @@ router.post('/', asyncHandler(async (req, res) => {
 
 // PATCH /api/projects/:id
 router.patch('/:id', asyncHandler(async (req, res) => {
-  const allowed = ['name', 'description', 'status', 'land_area_acres']
+  const allowed = ['name', 'description', 'status', 'land_area_acres', 'launch_date', 'completed_date']
   const updates = {}
   for (const k of allowed) if (req.body[k] !== undefined) updates[k] = req.body[k]
 

@@ -45,7 +45,7 @@ export default function StudyEditor() {
   const [saving, setSaving] = useState(false)
   const [lastSaved, setLastSaved] = useState(null)
   const [results, setResults] = useState(null)
-  const autoSaveTimer = useRef(null)
+  const phaseHeaderSaveRef = useRef(null)
 
   const { data: project } = useQuery({ queryKey: ['project', projectId], queryFn: () => projectsApi.get(projectId) })
   const { data: phases = [] } = useQuery({ queryKey: ['phases', projectId], queryFn: () => phasesApi.list(projectId) })
@@ -77,22 +77,17 @@ export default function StudyEditor() {
 
   function setUnitRow(idx, field, val) {
     setUnitRows(prev => prev.map((r, i) => i === idx ? { ...r, [field]: val } : r))
-    triggerAutoSave()
+    setIsDirty(true)
   }
   function addRow() { setUnitRows(prev => [...prev, emptyRow()]); setIsDirty(true) }
-  function removeRow(idx) { setUnitRows(prev => prev.filter((_, i) => i !== idx)); triggerAutoSave() }
-  function setCaField(field, val) { setCaForm(prev => ({ ...prev, [field]: val })); triggerAutoSave() }
-
-  function triggerAutoSave() {
-    setIsDirty(true)
-    clearTimeout(autoSaveTimer.current)
-    autoSaveTimer.current = setTimeout(saveAll, 2000)
-  }
+  function removeRow(idx) { setUnitRows(prev => prev.filter((_, i) => i !== idx)); setIsDirty(true) }
+  function setCaField(field, val) { setCaForm(prev => ({ ...prev, [field]: val })); setIsDirty(true) }
 
   async function saveAll() {
     if (!selectedPhaseId) return
     setSaving(true)
     try {
+      if (phaseHeaderSaveRef.current) await phaseHeaderSaveRef.current()
       const rows = unitRows.filter(r => r.name || r.unit_count || r.avg_size_sqft)
       await unitTypesApi.upsert(selectedPhaseId, rows.map(r => ({
         ...r,
@@ -189,7 +184,7 @@ export default function StudyEditor() {
             <div className="flex flex-col lg:flex-row h-full">
               {/* Input panel */}
               <div className="flex-1 overflow-y-auto p-4 sm:p-6">
-                <PhaseHeader phase={selectedPhase} readOnly={isMobile} onSave={(data) => phasesApi.update(selectedPhaseId, data).then(() => qc.invalidateQueries(['phases', projectId]))} />
+                <PhaseHeader phase={selectedPhase} readOnly={isMobile} saveRef={phaseHeaderSaveRef} onSave={(data) => phasesApi.update(selectedPhaseId, data).then(() => qc.invalidateQueries(['phases', projectId]))} />
 
 
                 {/* Tabs */}
@@ -226,11 +221,10 @@ export default function StudyEditor() {
   )
 }
 
-function PhaseHeader({ phase, onSave, readOnly }) {
+function PhaseHeader({ phase, onSave, readOnly, saveRef }) {
   const [devType, setDevType] = useState(phase?.dev_type || '')
   const [launchDate, setLaunchDate] = useState(phase?.launch_date || '')
   const [landArea, setLandArea] = useState(phase?.land_area_acres ?? '')
-  const timer = useRef(null)
 
   // Sync when phase changes
   useEffect(() => {
@@ -239,24 +233,34 @@ function PhaseHeader({ phase, onSave, readOnly }) {
     setLandArea(phase?.land_area_acres ?? '')
   }, [phase?.id])
 
-  function schedule(updates) {
-    clearTimeout(timer.current)
-    timer.current = setTimeout(() => onSave(updates), 800)
-  }
+  // Expose save function to parent
+  useEffect(() => {
+    if (saveRef) {
+      saveRef.current = () => onSave({
+        dev_type: devType,
+        launch_date: launchDate || null,
+        land_area_acres: parseFloat(landArea) || null,
+      })
+    }
+  })
 
   return (
     <div className="mb-5 pb-4 border-b border-gray-100">
       <h2 className="text-lg font-semibold text-gray-900 mb-3">{phase?.name}</h2>
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         <div>
-          <label className="text-xs font-medium text-gray-500 block mb-1">Dev Type</label>
-          <input
-            className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-brand-500 disabled:bg-gray-50 disabled:text-gray-500"
-            placeholder="e.g. 2-Storey Superlink"
+          <label className="text-xs font-medium text-gray-500 block mb-1">Development Type</label>
+          <select
+            className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-brand-500 disabled:bg-gray-50 disabled:text-gray-500 bg-white"
             value={devType}
             disabled={readOnly}
-            onChange={e => { setDevType(e.target.value); schedule({ dev_type: e.target.value }) }}
-          />
+            onChange={e => setDevType(e.target.value)}
+          >
+            <option value="">Select type...</option>
+            <option value="Residential">Residential</option>
+            <option value="Commercial">Commercial</option>
+            <option value="Mixed Development">Mixed Development</option>
+          </select>
         </div>
         <div>
           <label className="text-xs font-medium text-gray-500 block mb-1">Launch Date</label>
@@ -265,7 +269,7 @@ function PhaseHeader({ phase, onSave, readOnly }) {
             className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-brand-500 disabled:bg-gray-50 disabled:text-gray-500"
             value={launchDate}
             disabled={readOnly}
-            onChange={e => { setLaunchDate(e.target.value); schedule({ launch_date: e.target.value || null }) }}
+            onChange={e => setLaunchDate(e.target.value)}
           />
         </div>
         <div>
@@ -276,7 +280,7 @@ function PhaseHeader({ phase, onSave, readOnly }) {
             placeholder="0.00"
             value={landArea}
             disabled={readOnly}
-            onChange={e => { setLandArea(e.target.value); schedule({ land_area_acres: parseFloat(e.target.value) || null }) }}
+            onChange={e => setLandArea(e.target.value)}
           />
         </div>
       </div>

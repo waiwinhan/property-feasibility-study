@@ -16,6 +16,8 @@ import Input from '../components/ui/Input'
 import ImportModal from '../components/ImportModal'
 
 const STATUS_TABS = ['All', 'Active', 'On Hold', 'Completed', 'Archived']
+const STATUS_OPTIONS = ['Active', 'On Hold', 'Completed', 'Archived']
+const STATUS_ORDER = ['Active', 'On Hold', 'Completed', 'Archived']
 const SORT_OPTIONS = [
   { value: 'updated', label: 'Last Updated' },
   { value: 'name', label: 'Name A–Z' },
@@ -56,6 +58,11 @@ export default function PortfolioDashboard() {
       setNewName('')
       navigate(`/project/${proj.id}`)
     },
+  })
+
+  const updateMut = useMutation({
+    mutationFn: ({ id, data }) => projectsApi.update(id, data),
+    onSuccess: () => qc.invalidateQueries(['projects']),
   })
 
   const deleteMut = useMutation({
@@ -134,6 +141,28 @@ export default function PortfolioDashboard() {
     .filter(p => p.total_ndv > 0)
     .map(p => ({ name: p.name.length > 18 ? p.name.slice(0, 18) + '…' : p.name, margin: +(p.profit_margin_pct || 0).toFixed(1) }))
     .sort((a, b) => b.margin - a.margin)
+
+  function handleStatusChange(id, status) {
+    updateMut.mutate({ id, data: { status } })
+  }
+
+  function handleDateChange(id, data) {
+    updateMut.mutate({ id, data })
+  }
+
+  // Grouped view for "All" tab
+  const groupedByStatus = STATUS_ORDER.map(status => ({
+    status,
+    projects: filtered.filter(p => (p.status || 'Active') === status),
+  })).filter(g => g.projects.length > 0)
+
+  const cardProps = (project) => ({
+    project,
+    onClick: () => navigate(`/project/${project.id}`),
+    onDelete: () => setConfirmDeleteId(project.id),
+    onStatusChange: handleStatusChange,
+    onDateChange: handleDateChange,
+  })
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
@@ -248,15 +277,26 @@ export default function PortfolioDashboard() {
           title={projects.length === 0 ? 'No projects yet' : 'No matching projects'}
           description={projects.length === 0 ? 'Create your first feasibility study project.' : 'Try a different filter.'}
           action={projects.length === 0 && <Button onClick={() => setShowNew(true)}><Plus className="w-4 h-4" /> New Project</Button>} />
+      ) : statusFilter === 'All' ? (
+        <div className="space-y-8">
+          {groupedByStatus.map(({ status, projects: group }) => (
+            <div key={status}>
+              <div className="flex items-center gap-2 mb-4">
+                <span className={cn('text-xs font-semibold px-2.5 py-1 rounded-full', statusColor(status))}>{status}</span>
+                <span className="text-xs text-gray-400">{group.length} project{group.length !== 1 ? 's' : ''}</span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                {group.map(project => (
+                  <ProjectCard key={project.id} {...cardProps(project)} />
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {filtered.map(project => (
-            <ProjectCard
-              key={project.id}
-              project={project}
-              onClick={() => navigate(`/project/${project.id}`)}
-              onDelete={() => setConfirmDeleteId(project.id)}
-            />
+            <ProjectCard key={project.id} {...cardProps(project)} />
           ))}
         </div>
       )}
@@ -363,15 +403,32 @@ export default function PortfolioDashboard() {
   )
 }
 
-function ProjectCard({ project, onClick, onDelete }) {
+function ProjectCard({ project, onClick, onDelete, onStatusChange, onDateChange }) {
   const margin = project.profit_margin_pct
+
+  function fmtDate(d) {
+    if (!d) return ''
+    return new Date(d).toLocaleDateString('en-MY', { day: 'numeric', month: 'short', year: 'numeric' })
+  }
+
   return (
     <Card className="hover:shadow-md hover:border-brand-200 transition-all group">
       <CardBody className="space-y-3">
+        {/* Title row */}
         <div className="flex items-start justify-between gap-2">
           <h3 className="font-semibold text-gray-900 leading-tight line-clamp-2 cursor-pointer" onClick={onClick}>{project.name}</h3>
-          <div className="flex items-center gap-1.5 shrink-0">
-            <Badge className={statusColor(project.status)}>{project.status}</Badge>
+          <div className="flex items-center gap-1 shrink-0">
+            <select
+              value={project.status || 'Active'}
+              onClick={e => e.stopPropagation()}
+              onChange={e => { e.stopPropagation(); onStatusChange(project.id, e.target.value) }}
+              className={cn(
+                'text-xs font-medium rounded-full px-2 py-0.5 border-0 cursor-pointer focus:outline-none focus:ring-1 focus:ring-brand-500 appearance-none',
+                statusColor(project.status || 'Active')
+              )}
+            >
+              {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
             <button
               onClick={e => { e.stopPropagation(); onDelete() }}
               className="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-red-500 transition-all rounded"
@@ -381,12 +438,41 @@ function ProjectCard({ project, onClick, onDelete }) {
             </button>
           </div>
         </div>
+
+        {/* Metrics */}
         <div className="grid grid-cols-2 gap-y-2 text-sm cursor-pointer" onClick={onClick}>
           <div><p className="text-gray-500 text-xs">GDV</p><p className="font-medium">{formatRM(project.total_gdv, true)}</p></div>
           <div><p className="text-gray-500 text-xs">NDP</p><p className="font-medium">{formatRM(project.total_ndp, true)}</p></div>
           <div><p className="text-gray-500 text-xs">Margin</p><p className={cn('font-semibold', marginColor(margin))}>{formatPct(margin)}</p></div>
           <div><p className="text-gray-500 text-xs">Phases</p><p className="font-medium">{project.phase_count || 0}</p></div>
         </div>
+
+        {/* Dates */}
+        <div className="grid grid-cols-2 gap-2 pt-1 border-t border-gray-100">
+          <div>
+            <p className="text-xs text-gray-400 mb-1">Launch Date</p>
+            <input
+              type="date"
+              value={project.launch_date || ''}
+              onClick={e => e.stopPropagation()}
+              onBlur={e => onDateChange(project.id, { launch_date: e.target.value || null })}
+              onChange={e => e.stopPropagation()}
+              className="w-full border border-gray-200 rounded-md px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-brand-500 bg-white"
+            />
+          </div>
+          <div>
+            <p className="text-xs text-gray-400 mb-1">Completed Date</p>
+            <input
+              type="date"
+              value={project.completed_date || ''}
+              onClick={e => e.stopPropagation()}
+              onBlur={e => onDateChange(project.id, { completed_date: e.target.value || null })}
+              onChange={e => e.stopPropagation()}
+              className="w-full border border-gray-200 rounded-md px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-brand-500 bg-white"
+            />
+          </div>
+        </div>
+
         {project.updated_at && (
           <p className="text-xs text-gray-400 cursor-pointer" onClick={onClick}>Updated {new Date(project.updated_at).toLocaleDateString('en-MY', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
         )}
