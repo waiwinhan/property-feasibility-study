@@ -30,12 +30,8 @@ router.put('/:id', asyncHandler(async (req, res) => {
 
   // Update cost assumption overrides
   if (overrides) {
-    const { data: existing } = await supabase.from('scenario_cost_assumptions').select('id').eq('scenario_id', req.params.id).single()
-    if (existing) {
-      await supabase.from('scenario_cost_assumptions').update(overrides).eq('scenario_id', req.params.id)
-    } else {
-      await supabase.from('scenario_cost_assumptions').insert({ ...overrides, scenario_id: req.params.id })
-    }
+    await supabase.from('scenario_cost_assumptions')
+      .upsert({ ...overrides, scenario_id: req.params.id }, { onConflict: 'scenario_id' })
   }
 
   // Recalculate
@@ -140,19 +136,13 @@ function applyVariableOverride(scenario, variable, val) {
 
 async function getScenarioData(scenarioId) {
   const { data: scenario } = await supabase.from('scenarios').select('*, scenario_cost_assumptions(*)').eq('id', scenarioId).single()
-  const { data: phase } = await supabase.from('phases').select('project_id').eq('id', scenario.phase_id).single()
-  const [{ data: unitTypes }, { data: baseCa }] = await Promise.all([
+  const [{ data: unitTypes }, { data: baseCa }, { data: allocs }] = await Promise.all([
     supabase.from('unit_types').select('*').eq('phase_id', scenario.phase_id),
     supabase.from('cost_assumptions').select('*').eq('phase_id', scenario.phase_id).single(),
+    supabase.from('construction_cost_allocations').select('allocation_pct, construction_cost_pools(pool_total)').eq('phase_id', scenario.phase_id),
   ])
   const overrides = scenario.scenario_cost_assumptions?.[0] || {}
-  let poolsTotal = 0
-  if (phase?.project_id) {
-    const { data: allocs } = await supabase.from('construction_cost_allocations')
-      .select('allocation_pct, construction_cost_pools(pool_total)')
-      .eq('phase_id', scenario.phase_id)
-    for (const a of (allocs || [])) poolsTotal += (a.construction_cost_pools?.pool_total || 0) * (a.allocation_pct || 0) / 100
-  }
+  const poolsTotal = (allocs || []).reduce((sum, a) => sum + (a.construction_cost_pools?.pool_total || 0) * (a.allocation_pct || 0) / 100, 0)
   return { scenario, unitTypes: unitTypes || [], baseCa: baseCa || {}, overrides, poolsTotal }
 }
 
@@ -161,12 +151,8 @@ async function recalcScenario(scenarioId) {
   const ca = { ...scenario.baseCa, ...scenario.overrides }
   const results = calcPhase(scenario.unitTypes, ca, scenario.poolsTotal)
 
-  const { data: existing } = await supabase.from('scenario_results').select('id').eq('scenario_id', scenarioId).single()
-  if (existing) {
-    await supabase.from('scenario_results').update({ results, updated_at: new Date().toISOString() }).eq('scenario_id', scenarioId)
-  } else {
-    await supabase.from('scenario_results').insert({ scenario_id: scenarioId, results })
-  }
+  await supabase.from('scenario_results')
+    .upsert({ scenario_id: scenarioId, results, updated_at: new Date().toISOString() }, { onConflict: 'scenario_id' })
   return results
 }
 

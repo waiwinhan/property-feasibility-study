@@ -39,27 +39,23 @@ export default function ProjectDashboard() {
   const animMargin = useCountUp(blendedMargin ?? 0)
   const animUnits = useCountUp(totals.units)
 
+  const shortName14 = (name) => name.length > 14 ? name.slice(0, 14) + '…' : name
+  const r1 = v => Math.round(v / 1_000_000 * 10) / 10
+
   const marginChartData = activePhs.map(p => ({
-    name: p.name.length > 14 ? p.name.slice(0, 14) + '…' : p.name,
+    name: shortName14(p.name),
     margin: +(p.profit_margin_pct || 0).toFixed(1),
     ndp: p.total_ndp || 0,
     ndv: p.total_ndv || 0,
   }))
 
-  const ndpChartData = activePhs.map(p => ({
-    name: p.name.length > 14 ? p.name.slice(0, 14) + '…' : p.name,
-    ndp: Math.round((p.total_ndp || 0) / 1_000_000 * 10) / 10,
-  }))
-
   const gdvNdvChartData = activePhs.map(p => ({
-    name: p.name.length > 14 ? p.name.slice(0, 14) + '…' : p.name,
-    gdv: Math.round((p.total_gdv || 0) / 1_000_000 * 10) / 10,
-    ndv: Math.round((p.total_ndv || 0) / 1_000_000 * 10) / 10,
+    name: shortName14(p.name),
+    gdv: r1(p.total_gdv || 0),
+    ndv: r1(p.total_ndv || 0),
   }))
 
   // Waterfall: NDV → GCC → Other Costs → NDP
-  const M = 1_000_000
-  const r1 = v => Math.round(v / M * 10) / 10
   const otherCosts = Math.max(totals.ndv - totals.gcc - totals.ndp, 0)
   const waterfallData = [
     { name: 'NDV', spacer: 0, value: r1(totals.ndv), color: '#3b82f6' },
@@ -86,7 +82,7 @@ export default function ProjectDashboard() {
   const psfChartData = activePhs
     .filter(p => p.financial_results?.constPsf > 0)
     .map(p => ({
-      name: p.name.length > 14 ? p.name.slice(0, 14) + '…' : p.name,
+      name: shortName14(p.name),
       psf: Math.round(p.financial_results.constPsf * 100) / 100,
     }))
   const avgPsf = psfChartData.length > 0

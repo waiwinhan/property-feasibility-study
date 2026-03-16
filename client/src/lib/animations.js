@@ -34,7 +34,10 @@ export function useCountUp(target, duration = 700) {
  * Reacts to window resize.
  */
 export function useIsMobile() {
-  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768)
+  const [isMobile, setIsMobile] = useState(() => {
+    if (typeof window === 'undefined') return false
+    return window.matchMedia('(max-width: 767px)').matches
+  })
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 767px)')
     const handler = (e) => setIsMobile(e.matches)
@@ -44,22 +47,3 @@ export function useIsMobile() {
   return isMobile
 }
 
-// Minimal animation helpers — countUp + opacity fade only
-export function countUp(el, end, duration = 600) {
-  if (!el) return
-  const start = 0
-  const startTime = performance.now()
-  const step = (now) => {
-    const progress = Math.min((now - startTime) / duration, 1)
-    const ease = 1 - Math.pow(1 - progress, 3)
-    el.textContent = Math.round(start + (end - start) * ease).toLocaleString()
-    if (progress < 1) requestAnimationFrame(step)
-  }
-  requestAnimationFrame(step)
-}
-
-export const fadeIn = {
-  initial: { opacity: 0 },
-  animate: { opacity: 1 },
-  transition: { duration: 0.2 },
-}

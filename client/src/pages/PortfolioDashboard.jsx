@@ -15,9 +15,9 @@ import { Modal } from '../components/ui/Modal'
 import Input from '../components/ui/Input'
 import ImportModal from '../components/ImportModal'
 
-const STATUS_TABS = ['All', 'Active', 'On Hold', 'Completed', 'Archived']
 const STATUS_OPTIONS = ['Active', 'On Hold', 'Completed', 'Archived']
-const STATUS_ORDER = ['Active', 'On Hold', 'Completed', 'Archived']
+const STATUS_ORDER = STATUS_OPTIONS
+const STATUS_TABS = ['All', ...STATUS_OPTIONS]
 const SORT_OPTIONS = [
   { value: 'updated', label: 'Last Updated' },
   { value: 'name', label: 'Name A–Z' },

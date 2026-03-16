@@ -26,18 +26,27 @@ export function formatPSF(value) {
   return `RM ${Number(value).toFixed(2)}`
 }
 
+function marginTier(margin, hurdle) {
+  if (margin == null) return 'null'
+  if (margin >= hurdle) return 'above'
+  if (margin >= hurdle - 3) return 'near'
+  return 'below'
+}
+
 export function marginColor(margin, hurdle = 15) {
-  if (margin == null) return 'text-gray-400'
-  if (margin >= hurdle) return 'text-green-600'
-  if (margin >= hurdle - 3) return 'text-amber-500'
-  return 'text-red-600'
+  const tier = marginTier(margin, hurdle)
+  if (tier === 'above') return 'text-green-600'
+  if (tier === 'near') return 'text-amber-500'
+  if (tier === 'below') return 'text-red-600'
+  return 'text-gray-400'
 }
 
 export function marginBg(margin, hurdle = 15) {
-  if (margin == null) return 'bg-gray-100'
-  if (margin >= hurdle) return 'bg-green-50 border-green-200'
-  if (margin >= hurdle - 3) return 'bg-amber-50 border-amber-200'
-  return 'bg-red-50 border-red-200'
+  const tier = marginTier(margin, hurdle)
+  if (tier === 'above') return 'bg-green-50 border-green-200'
+  if (tier === 'near') return 'bg-amber-50 border-amber-200'
+  if (tier === 'below') return 'bg-red-50 border-red-200'
+  return 'bg-gray-100'
 }
 
 export function statusColor(status) {

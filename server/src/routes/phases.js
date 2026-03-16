@@ -3,6 +3,7 @@ const router = express.Router()
 const supabase = require('../lib/supabase')
 const { calcPhase } = require('../lib/calculations')
 const asyncHandler = require('../lib/asyncHandler')
+const clonePhaseChildren = require('../lib/clonePhaseChildren')
 
 // GET /api/phases/:id
 router.get('/:id', asyncHandler(async (req, res) => {
@@ -42,17 +43,7 @@ router.post('/:id/duplicate', asyncHandler(async (req, res) => {
   }).select().single()
   if (e2) throw e2
 
-  const { data: unitTypes } = await supabase.from('unit_types').select('*').eq('phase_id', oldId)
-  for (const ut of (unitTypes || [])) {
-    const { id, phase_id, ...utData } = ut
-    await supabase.from('unit_types').insert({ ...utData, phase_id: newPhase.id })
-  }
-  const { data: ca } = await supabase.from('cost_assumptions').select('*').eq('phase_id', oldId).single()
-  if (ca) {
-    const { id, phase_id, ...caData } = ca
-    await supabase.from('cost_assumptions').insert({ ...caData, phase_id: newPhase.id })
-  }
-
+  await clonePhaseChildren(oldId, newPhase.id)
   res.status(201).json(newPhase)
 }))
 
@@ -101,21 +92,12 @@ router.get('/:id/cost-assumptions', asyncHandler(async (req, res) => {
 
 // PATCH /api/phases/:id/cost-assumptions
 router.patch('/:id/cost-assumptions', asyncHandler(async (req, res) => {
-  // Upsert cost assumptions
-  const { data: existing } = await supabase.from('cost_assumptions').select('id').eq('phase_id', req.params.id).single()
+  const { data: result, error } = await supabase
+    .from('cost_assumptions')
+    .upsert({ ...req.body, phase_id: req.params.id }, { onConflict: 'phase_id' })
+    .select().single()
+  if (error) throw error
 
-  let result
-  if (existing) {
-    const { data, error } = await supabase.from('cost_assumptions').update(req.body).eq('phase_id', req.params.id).select().single()
-    if (error) throw error
-    result = data
-  } else {
-    const { data, error } = await supabase.from('cost_assumptions').insert({ ...req.body, phase_id: req.params.id }).select().single()
-    if (error) throw error
-    result = data
-  }
-
-  // Recalculate phase
   await recalcPhase(req.params.id)
   res.json(result)
 }))

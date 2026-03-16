@@ -3,6 +3,7 @@ const router = express.Router()
 const supabase = require('../lib/supabase')
 const { calcPhase, calcPortfolio } = require('../lib/calculations')
 const asyncHandler = require('../lib/asyncHandler')
+const clonePhaseChildren = require('../lib/clonePhaseChildren')
 
 // GET /api/projects
 router.get('/', asyncHandler(async (req, res) => {
@@ -127,22 +128,11 @@ router.post('/:id/clone', asyncHandler(async (req, res) => {
   if (e2) throw e2
 
   const { data: phases } = await supabase.from('phases').select('*').eq('project_id', req.params.id).order('sort_order')
-  for (const phase of (phases || [])) {
+  await Promise.all((phases || []).map(async (phase) => {
     const { id: oldPhaseId, project_id, created_at, updated_at, ...phaseData } = phase
     const { data: newPhase } = await supabase.from('phases').insert({ ...phaseData, project_id: newProject.id }).select().single()
-    if (newPhase) {
-      const { data: unitTypes } = await supabase.from('unit_types').select('*').eq('phase_id', oldPhaseId)
-      for (const ut of (unitTypes || [])) {
-        const { id, phase_id, ...utData } = ut
-        await supabase.from('unit_types').insert({ ...utData, phase_id: newPhase.id })
-      }
-      const { data: ca } = await supabase.from('cost_assumptions').select('*').eq('phase_id', oldPhaseId).single()
-      if (ca) {
-        const { id, phase_id, ...caData } = ca
-        await supabase.from('cost_assumptions').insert({ ...caData, phase_id: newPhase.id })
-      }
-    }
-  }
+    if (newPhase) await clonePhaseChildren(oldPhaseId, newPhase.id)
+  }))
 
   res.status(201).json(newProject)
 }))
@@ -214,35 +204,36 @@ router.put('/:id/cost-allocation', asyncHandler(async (req, res) => {
   // pools = [{ id?, name, pool_total, allocations: [{ phase_id, allocation_pct }] }]
 
   // Validate: each pool's allocations must sum to 100 (±0.1 tolerance)
-  const invalid = (pools || []).filter(pool => {
-    if (!pool.allocations || pool.allocations.length === 0) return false
-    const sum = pool.allocations.reduce((s, a) => s + (Number(a.allocation_pct) || 0), 0)
-    return Math.abs(sum - 100) > 0.1
-  })
+  const poolsWithSums = (pools || []).map(pool => ({
+    ...pool,
+    sum: (pool.allocations || []).reduce((s, a) => s + (Number(a.allocation_pct) || 0), 0),
+  }))
+  const invalid = poolsWithSums.filter(pool => pool.allocations?.length > 0 && Math.abs(pool.sum - 100) > 0.1)
   if (invalid.length > 0) {
     return res.status(400).json({
       error: 'Allocation percentages must sum to 100% for each pool.',
-      pools: invalid.map(p => ({ name: p.name, sum: p.allocations.reduce((s, a) => s + (Number(a.allocation_pct) || 0), 0) })),
+      pools: invalid.map(p => ({ name: p.name, sum: p.sum })),
     })
   }
 
-  const result = []
-  for (const pool of (pools || [])) {
+  const result = await Promise.all((pools || []).map(async (pool) => {
     let poolId = pool.id
+    let poolData
     if (poolId) {
       const { data } = await supabase.from('construction_cost_pools').update({ name: pool.name, pool_total: pool.pool_total }).eq('id', poolId).select().single()
-      result.push(data)
+      poolData = data
     } else {
       const { data } = await supabase.from('construction_cost_pools').insert({ project_id: req.params.id, name: pool.name, pool_total: pool.pool_total }).select().single()
       poolId = data.id
-      result.push(data)
+      poolData = data
     }
-    if (poolId && pool.allocations) {
-      for (const alloc of pool.allocations) {
-        await supabase.from('construction_cost_allocations').upsert({ pool_id: poolId, phase_id: alloc.phase_id, allocation_pct: alloc.allocation_pct }, { onConflict: 'pool_id,phase_id' })
-      }
+    if (poolId && pool.allocations?.length) {
+      await Promise.all(pool.allocations.map(alloc =>
+        supabase.from('construction_cost_allocations').upsert({ pool_id: poolId, phase_id: alloc.phase_id, allocation_pct: alloc.allocation_pct }, { onConflict: 'pool_id,phase_id' })
+      ))
     }
-  }
+    return poolData
+  }))
   res.json(result)
 }))
 
@@ -294,8 +285,7 @@ router.post('/import', asyncHandler(async (req, res) => {
   if (projErr) throw projErr
 
   // Create phases + unit types
-  for (let i = 0; i < phases.length; i++) {
-    const ph = phases[i]
+  await Promise.all(phases.map(async (ph, i) => {
     const { data: phase, error: phErr } = await supabase
       .from('phases')
       .insert({
@@ -309,24 +299,22 @@ router.post('/import', asyncHandler(async (req, res) => {
       .select().single()
     if (phErr) throw phErr
 
-    // Default cost assumptions
     const caInsert = { phase_id: phase.id }
     if (ph.land_cost_psf) caInsert.land_cost_psf = ph.land_cost_psf
-    await supabase.from('cost_assumptions').insert(caInsert)
 
-    // Unit types
+    const inserts = [supabase.from('cost_assumptions').insert(caInsert)]
     if (ph.unitTypes?.length) {
-      const rows = ph.unitTypes.map(ut => ({
+      inserts.push(supabase.from('unit_types').insert(ph.unitTypes.map(ut => ({
         phase_id: phase.id,
         name: ut.name,
         category: ut.category || 'Residential',
         unit_count: ut.unit_count || 0,
         avg_size_sqft: ut.avg_size_sqft || 0,
         selling_psf: ut.selling_psf || 0,
-      }))
-      await supabase.from('unit_types').insert(rows)
+      }))))
     }
-  }
+    await Promise.all(inserts)
+  }))
 
   res.status(201).json(project)
 }))
