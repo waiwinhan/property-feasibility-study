@@ -10,7 +10,6 @@ import Spinner from '../components/ui/Spinner'
 import { Card, CardHeader, CardBody } from '../components/ui/Card'
 import apiClient from '../api/client'
 
-const TABS = ['GDV', 'Costs']
 const CATEGORIES = ['Residential', 'Affordable', 'Commercial - Serviced Apartment', 'Commercial - Shoplot/Retail']
 const CATEGORY_COLORS = { 
   Residential: 'text-blue-600 bg-blue-50', 
@@ -43,7 +42,6 @@ export default function StudyEditor() {
   const qc = useQueryClient()
   const isMobile = useIsMobile()
 
-  const [activeTab, setActiveTab] = useState('GDV')
   const [selectedPhaseId, setSelectedPhaseId] = useState(searchParams.get('phase') || null)
   const [unitRows, setUnitRows] = useState([])
   const [caForm, setCaForm] = useState(DEFAULT_CA)
@@ -122,7 +120,7 @@ export default function StudyEditor() {
         <div className="text-sm text-gray-500 flex items-center gap-1">
           <span className="font-medium text-gray-900">{project?.name}</span>
           <ChevronRight className="w-3 h-3" />
-          <span>Study Editor</span>
+          <span>Feasibility Study</span>
         </div>
         <div className="flex-1" />
         {isMobile ? (
@@ -190,29 +188,12 @@ export default function StudyEditor() {
             <div className="flex flex-col lg:flex-row h-full">
               {/* Input panel */}
               <div className="flex-1 overflow-y-auto p-4 sm:p-6">
-                <PhaseHeader phase={selectedPhase} readOnly={isMobile} saveRef={phaseHeaderSaveRef} onSave={(data) => phasesApi.update(selectedPhaseId, data).then(() => qc.invalidateQueries(['phases', projectId]))} />
+                <PhaseHeader phase={selectedPhase} readOnly={isMobile} saveRef={phaseHeaderSaveRef} onSave={(data) => phasesApi.update(selectedPhaseId, data).then(() => qc.invalidateQueries(['phases', projectId]))} onLandAreaChange={(val) => setCaField('land_area_acres', parseFloat(val) || 0)} />
 
 
-                {/* Tabs */}
-                <div className="flex gap-1 mb-6 bg-gray-100 p-1 rounded-lg w-fit">
-                  {TABS.map(tab => (
-                    <button
-                      key={tab}
-                      onClick={() => setActiveTab(tab)}
-                      className={cn('px-4 py-1.5 text-sm font-medium rounded-md transition-colors',
-                        activeTab === tab ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900')}
-                    >
-                      {tab}
-                    </button>
-                  ))}
-                </div>
-
-                {activeTab === 'GDV' && (
-                  <GDVTab unitRows={unitRows} setUnitRow={setUnitRow} addRow={addRow} removeRow={removeRow} caForm={caForm} setCaField={setCaField} readOnly={isMobile} />
-                )}
-                {activeTab === 'Costs' && (
-                  <CostsTab caForm={caForm} setCaField={setCaField} projectId={projectId} readOnly={isMobile} />
-                )}
+                <GDVTab unitRows={unitRows} setUnitRow={setUnitRow} addRow={addRow} removeRow={removeRow} caForm={caForm} setCaField={setCaField} readOnly={isMobile} />
+                <div className="my-6 border-t border-gray-200" />
+                <CostsTab caForm={caForm} setCaField={setCaField} projectId={projectId} readOnly={isMobile} unitRows={unitRows} />
               </div>
 
               {/* Financial Summary sidebar */}
@@ -227,13 +208,18 @@ export default function StudyEditor() {
   )
 }
 
-function PhaseHeader({ phase, onSave, readOnly, saveRef }) {
+function PhaseHeader({ phase, onSave, readOnly, saveRef, onLandAreaChange }) {
   const [devType, setDevType] = useState(phase?.dev_type || '')
   const [launchDate, setLaunchDate] = useState(phase?.launch_date || '')
   const [vpDate, setVpDate] = useState(phase?.vp_date || '')
   const [landArea, setLandArea] = useState(phase?.land_area_acres ?? '')
   const [constructionStart, setConstructionStart] = useState(phase?.construction_start_date || '')
   const [constructionEnd, setConstructionEnd] = useState(phase?.construction_end_date || '')
+
+  function handleLandAreaChange(val) {
+    setLandArea(val)
+    if (onLandAreaChange) onLandAreaChange(val)
+  }
 
   // Calculate months between two dates
   const calculateMonths = (start, end) => {
@@ -252,7 +238,9 @@ function PhaseHeader({ phase, onSave, readOnly, saveRef }) {
     setDevType(phase?.dev_type || '')
     setLaunchDate(phase?.launch_date || '')
     setVpDate(phase?.vp_date || '')
-    setLandArea(phase?.land_area_acres ?? '')
+    const la = phase?.land_area_acres ?? ''
+    setLandArea(la)
+    if (onLandAreaChange) onLandAreaChange(la)
     setConstructionStart(phase?.construction_start_date || '')
     setConstructionEnd(phase?.construction_end_date || '')
   }, [phase?.id])
@@ -323,7 +311,7 @@ function PhaseHeader({ phase, onSave, readOnly, saveRef }) {
             placeholder="0.00"
             value={landArea}
             disabled={readOnly}
-            onChange={e => setLandArea(e.target.value)}
+            onChange={e => handleLandAreaChange(e.target.value)}
           />
         </div>
         <div>
@@ -359,13 +347,13 @@ function PhaseHeader({ phase, onSave, readOnly, saveRef }) {
 
 function GDVTab({ unitRows, setUnitRow, addRow, removeRow, caForm, setCaField, readOnly }) {
   const hasBumiApplicableUnits = unitRows.some(row => BUMI_APPLICABLE_CATEGORIES.includes(row.category))
-  
+
   // Group rows by category
   const rowsByCategory = CATEGORIES.reduce((acc, cat) => {
     acc[cat] = unitRows.filter((row, idx) => row.category === cat)
     return acc
   }, {})
-  
+
   // Calculate subtotals for each category
   const calculateSubtotal = (rows) => {
     return rows.reduce((acc, row) => {
@@ -374,18 +362,18 @@ function GDVTab({ unitRows, setUnitRow, addRow, removeRow, caForm, setCaField, r
       const psf = parseFloat(row.selling_psf) || 0
       acc.units += units
       acc.netArea += units * size
-      acc.gdv += units * size * psf
+      acc.ndv += units * size * psf
       return acc
-    }, { units: 0, netArea: 0, gdv: 0 })
+    }, { units: 0, netArea: 0, ndv: 0 })
   }
-  
+
   // Calculate grand total
   const grandTotal = calculateSubtotal(unitRows)
   
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-gray-700">Section A — Gross Development Value</h3>
+        <h3 className="text-sm font-semibold text-gray-700">Section A — Net Development Value</h3>
         {!readOnly && <Button size="sm" variant="secondary" onClick={addRow}><Plus className="w-3.5 h-3.5" /> Add Row</Button>}
       </div>
 
@@ -394,11 +382,11 @@ function GDVTab({ unitRows, setUnitRow, addRow, removeRow, caForm, setCaField, r
           <thead>
             <tr className="bg-gray-50 border-b border-gray-200">
               <th className="px-3 py-2.5 text-left font-medium text-gray-600 min-w-[140px]">Unit Type</th>
-              <th className="px-3 py-2.5 text-left font-medium text-gray-600 min-w-[180px]">Category</th>
+              <th className="px-3 py-2.5 text-left font-medium text-gray-600 min-w-[210px]">Category</th>
               <th className="px-3 py-2.5 text-right font-medium text-gray-600 w-24">Units</th>
               <th className="px-3 py-2.5 text-right font-medium text-gray-600 w-28">Size (sqft)</th>
-              <th className="px-3 py-2.5 text-right font-medium text-gray-600 w-36">Selling PSF (RM)</th>
-              <th className="px-3 py-2.5 text-right font-medium text-gray-600 w-40">GDV</th>
+              <th className="px-3 py-2.5 text-right font-medium text-gray-600 w-36">NDV PSF (RM)</th>
+              <th className="px-3 py-2.5 text-right font-medium text-gray-600 w-40">NDV</th>
               <th className="px-2 py-2.5 w-8"></th>
             </tr>
           </thead>
@@ -413,7 +401,7 @@ function GDVTab({ unitRows, setUnitRow, addRow, removeRow, caForm, setCaField, r
                 <React.Fragment key={`cat-${cat}`}>
                   {catRows.map((row, idx) => {
                     const rowIndex = unitRows.indexOf(row)
-                    const gdv = (parseInt(row.unit_count) || 0) * (parseFloat(row.avg_size_sqft) || 0) * (parseFloat(row.selling_psf) || 0)
+                    const ndv = (parseInt(row.unit_count) || 0) * (parseFloat(row.avg_size_sqft) || 0) * (parseFloat(row.selling_psf) || 0)
                     return (
                       <tr key={`${cat}-${idx}`} className="hover:bg-gray-50 group">
                         <td className="px-3 py-2">
@@ -427,7 +415,7 @@ function GDVTab({ unitRows, setUnitRow, addRow, removeRow, caForm, setCaField, r
                         </td>
                         <td className="px-3 py-2">
                           <select
-                            className="w-full min-w-[160px] bg-transparent border-0 focus:outline-none text-sm disabled:cursor-default truncate"
+                            className="w-full min-w-[200px] bg-transparent border-0 focus:outline-none text-sm disabled:cursor-default truncate"
                             value={row.category}
                             disabled={readOnly}
                             onChange={e => setUnitRow(rowIndex, 'category', e.target.value)}
@@ -458,7 +446,7 @@ function GDVTab({ unitRows, setUnitRow, addRow, removeRow, caForm, setCaField, r
                           </div>
                         </td>
                         <td className="px-3 py-2 text-right text-gray-600 font-medium whitespace-nowrap">
-                          {gdv > 0 ? formatRM(gdv) : '—'}
+                          {ndv > 0 ? formatRM(ndv) : '—'}
                         </td>
                         <td className="px-2 py-2">
                           {!readOnly && (
@@ -476,7 +464,7 @@ function GDVTab({ unitRows, setUnitRow, addRow, removeRow, caForm, setCaField, r
                     <td className="px-3 py-2 text-right text-sm font-semibold text-gray-700">{subtotal.units.toLocaleString()}</td>
                     <td className="px-3 py-2 text-right text-sm font-semibold text-gray-700">{subtotal.netArea.toLocaleString()}</td>
                     <td></td>
-                    <td className="px-3 py-2 text-right text-sm font-bold text-gray-800 whitespace-nowrap">{formatRM(subtotal.gdv)}</td>
+                    <td className="px-3 py-2 text-right text-sm font-bold text-gray-800 whitespace-nowrap">{formatRM(subtotal.ndv)}</td>
                     <td></td>
                   </tr>
                 </React.Fragment>
@@ -489,7 +477,7 @@ function GDVTab({ unitRows, setUnitRow, addRow, removeRow, caForm, setCaField, r
               <td className="px-3 py-2.5 text-right text-sm font-bold text-gray-900">{grandTotal.units.toLocaleString()}</td>
               <td className="px-3 py-2.5 text-right text-sm font-bold text-gray-900">{grandTotal.netArea.toLocaleString()}</td>
               <td></td>
-              <td className="px-3 py-2.5 text-right text-sm font-bold text-gray-900 whitespace-nowrap">{formatRM(grandTotal.gdv)}</td>
+              <td className="px-3 py-2.5 text-right text-sm font-bold text-gray-900 whitespace-nowrap">{formatRM(grandTotal.ndv)}</td>
               <td></td>
             </tr>
           </tfoot>
@@ -528,16 +516,38 @@ function GDVTab({ unitRows, setUnitRow, addRow, removeRow, caForm, setCaField, r
   )
 }
 
-function CostsTab({ caForm, setCaField, projectId, readOnly }) {
+function CostsTab({ caForm, setCaField, projectId, readOnly, unitRows = [] }) {
   const [expanded, setExpanded] = useState({
     building: true, land: true, statutory: false, authority: false, professional: false, finance: false, overheads: false,
   })
+
+  // Compute net saleable area per category from Section A
+  const calcArea = (catFilter) => unitRows.reduce((sum, r) => {
+    if (catFilter(r.category)) sum += (parseInt(r.unit_count) || 0) * (parseFloat(r.avg_size_sqft) || 0)
+    return sum
+  }, 0)
+  const residentialArea = calcArea(c => c === 'Residential')
+  const affordableArea  = calcArea(c => c === 'Affordable')
+  const commercialArea  = calcArea(c => c.startsWith('Commercial'))
   const { data: pools = [] } = useQuery({
     queryKey: ['allocation', projectId],
     queryFn: () => allocationApi.get(projectId),
     enabled: !!projectId,
   })
   const toggle = (k) => setExpanded(prev => ({ ...prev, [k]: !prev[k] }))
+
+  // Construction cost calculations (mirrors server calcGCC logic)
+  const totalBuildingCost = residentialArea * (caForm.building_psf_residential || 0)
+                          + affordableArea  * (caForm.building_psf_affordable  || 0)
+                          + commercialArea  * (caForm.building_psf_commercial  || 0)
+  const infrastructureCost = pools.reduce((s, p) => s + (p.pool_total || 0), 0)
+  const subtotalBC         = totalBuildingCost + infrastructureCost
+  const prelimAmount       = subtotalBC * ((caForm.preliminary_pct || 0) / 100)
+  const contingencyAmount  = (subtotalBC + prelimAmount) * ((caForm.contingency_pct || 0) / 100)
+  const sstAmount          = commercialArea * (caForm.building_psf_commercial || 0) * ((caForm.sst_pct || 0) / 100)
+  const totalConstructionCost = totalBuildingCost + infrastructureCost + prelimAmount + contingencyAmount + sstAmount
+  const totalArea          = residentialArea + affordableArea + commercialArea
+  const tccPsf             = totalArea > 0 ? totalConstructionCost / totalArea : 0
 
   const N = ({ label, field, pct, decimals = 2 }) => (
     <div className="flex items-center justify-between py-2 border-b border-gray-50">
@@ -568,47 +578,197 @@ function CostsTab({ caForm, setCaField, projectId, readOnly }) {
     </div>
   )
 
+  const [poolsExpanded, setPoolsExpanded] = useState(true)
+
   return (
-    <div className="space-y-1 max-w-xl">
+    <div className="space-y-1">
       <h3 className="text-sm font-semibold text-gray-700 mb-4">Section B — Gross Development Cost</h3>
 
       {/* Infrastructure / Cost Pool Summary */}
-      <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 mb-4">
-        <div className="flex items-center justify-between mb-2">
+      <div className="rounded-lg border border-gray-200 bg-gray-50 mb-4">
+        <div
+          className="flex items-center justify-between px-4 py-3 cursor-pointer select-none"
+          onClick={() => setPoolsExpanded(v => !v)}
+        >
           <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Infrastructure Cost Pools</span>
-          <Link to={`/project/${projectId}/cost-allocation`} className="text-xs text-brand-600 hover:text-brand-800 font-medium">
-            Edit allocation →
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link
+              to={`/project/${projectId}/cost-allocation`}
+              className="text-xs text-brand-600 hover:text-brand-800 font-medium"
+              onClick={e => e.stopPropagation()}
+            >
+              Edit allocation →
+            </Link>
+            {poolsExpanded ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
+          </div>
         </div>
-        {pools.length === 0 ? (
-          <p className="text-xs text-gray-400 italic">No pools defined. <Link to={`/project/${projectId}/cost-allocation`} className="text-brand-600 hover:underline">Set up cost allocation</Link>.</p>
-        ) : (
-          <div className="divide-y divide-gray-100">
-            {pools.map(pool => (
-              <div key={pool.id} className="flex items-center justify-between py-1.5 text-sm">
-                <span className="text-gray-700">{pool.name}</span>
-                <span className="font-medium text-gray-900">{formatRM(pool.pool_total)}</span>
+        {poolsExpanded && (
+          <div className="px-4 pb-3">
+            {pools.length === 0 ? (
+              <p className="text-xs text-gray-400 italic">No pools defined. <Link to={`/project/${projectId}/cost-allocation`} className="text-brand-600 hover:underline">Set up cost allocation</Link>.</p>
+            ) : (
+              <div className="divide-y divide-gray-100">
+                {pools.map(pool => (
+                  <div key={pool.id} className="flex items-center justify-between py-1.5 text-sm">
+                    <span className="text-gray-700">{pool.name}</span>
+                    <span className="font-medium text-gray-900">{formatRM(pool.pool_total)}</span>
+                  </div>
+                ))}
+                <div className="flex items-center justify-between py-1.5 text-sm font-semibold">
+                  <span className="text-gray-700">Total</span>
+                  <span className="text-gray-900">{formatRM(pools.reduce((s, p) => s + (p.pool_total || 0), 0), true)}</span>
+                </div>
               </div>
-            ))}
-            <div className="flex items-center justify-between py-1.5 text-sm font-semibold">
-              <span className="text-gray-700">Total</span>
-              <span className="text-gray-900">{formatRM(pools.reduce((s, p) => s + (p.pool_total || 0), 0), true)}</span>
-            </div>
+            )}
           </div>
         )}
       </div>
 
-      <Section title="Building PSF" skey="building">
-        <N label="Residential PSF" field="building_psf_residential" />
-        <N label="Affordable PSF" field="building_psf_affordable" />
-        <N label="Commercial PSF" field="building_psf_commercial" />
-        <N label="Preliminary %" field="preliminary_pct" pct />
-        <N label="Contingency %" field="contingency_pct" pct />
-        <N label="SST % (Commercial)" field="sst_pct" pct />
+      <Section title="Total Construction Cost" skey="building">
+        <div className="-mx-4 mb-1">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-gray-50 border-b border-gray-100">
+                <th className="px-4 py-2 text-left font-medium text-gray-500">Item</th>
+                <th className="px-4 py-2 text-right font-medium text-gray-500">Size (sqft)</th>
+                <th className="px-4 py-2 text-right font-medium text-gray-500">Rate</th>
+                <th className="px-4 py-2 text-right font-medium text-gray-500">RM Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              {/* Building cost per category */}
+              {[
+                { label: 'Residential', field: 'building_psf_residential', area: residentialArea },
+                { label: 'Affordable',  field: 'building_psf_affordable',  area: affordableArea },
+                { label: 'Commercial',  field: 'building_psf_commercial',  area: commercialArea },
+              ].map(({ label, field, area }) => {
+                const psf = caForm[field] || 0
+                const total = area * psf
+                return (
+                  <tr key={label} className="border-b border-gray-50">
+                    <td className="px-4 py-2 text-gray-600">{label}</td>
+                    <td className="px-4 py-2 text-right text-gray-600">{area > 0 ? area.toLocaleString() : '—'}</td>
+                    <td className="px-4 py-2 text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        <span className="text-xs text-gray-400">RM</span>
+                        <input type="number" step="any" min="0"
+                          className="w-20 text-right border border-gray-200 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-brand-500 disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-default"
+                          value={caForm[field] ?? ''} disabled={readOnly}
+                          onChange={e => setCaField(field, parseFloat(e.target.value) || 0)}
+                        />
+                      </div>
+                    </td>
+                    <td className="px-4 py-2 text-right font-medium text-gray-800 whitespace-nowrap">
+                      {total > 0 ? formatRM(total) : '—'}
+                    </td>
+                  </tr>
+                )
+              })}
+
+              {/* Total Building Cost subtotal */}
+              <tr className="bg-gray-50 border-t border-gray-200 font-semibold">
+                <td className="px-4 py-2 text-gray-700">Total Building Cost</td>
+                <td className="px-4 py-2 text-right text-gray-600">{totalArea > 0 ? totalArea.toLocaleString() : '—'}</td>
+                <td></td>
+                <td className="px-4 py-2 text-right text-gray-900 whitespace-nowrap">{formatRM(totalBuildingCost)}</td>
+              </tr>
+
+              {/* Infrastructure cost pools */}
+              <tr className="border-b border-gray-50">
+                <td className="px-4 py-2 text-gray-600">Infrastructure Cost Pools</td>
+                <td></td>
+                <td></td>
+                <td className="px-4 py-2 text-right font-medium text-gray-800 whitespace-nowrap">
+                  {infrastructureCost > 0 ? formatRM(infrastructureCost) : '—'}
+                </td>
+              </tr>
+
+              {/* Preliminary */}
+              <tr className="border-b border-gray-50">
+                <td className="px-4 py-2 text-gray-600">Preliminary</td>
+                <td></td>
+                <td className="px-4 py-2 text-right">
+                  <div className="flex items-center justify-end gap-1">
+                    <input type="number" step="any"
+                      className="w-16 text-right border border-gray-200 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-brand-500 disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-default"
+                      value={caForm.preliminary_pct ?? ''} disabled={readOnly}
+                      onChange={e => setCaField('preliminary_pct', parseFloat(e.target.value) || 0)}
+                    />
+                    <span className="text-xs text-gray-400">%</span>
+                  </div>
+                </td>
+                <td className="px-4 py-2 text-right font-medium text-gray-800 whitespace-nowrap">
+                  {prelimAmount > 0 ? formatRM(prelimAmount) : '—'}
+                </td>
+              </tr>
+
+              {/* Contingency */}
+              <tr className="border-b border-gray-50">
+                <td className="px-4 py-2 text-gray-600">Contingency</td>
+                <td></td>
+                <td className="px-4 py-2 text-right">
+                  <div className="flex items-center justify-end gap-1">
+                    <input type="number" step="any"
+                      className="w-16 text-right border border-gray-200 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-brand-500 disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-default"
+                      value={caForm.contingency_pct ?? ''} disabled={readOnly}
+                      onChange={e => setCaField('contingency_pct', parseFloat(e.target.value) || 0)}
+                    />
+                    <span className="text-xs text-gray-400">%</span>
+                  </div>
+                </td>
+                <td className="px-4 py-2 text-right font-medium text-gray-800 whitespace-nowrap">
+                  {contingencyAmount > 0 ? formatRM(contingencyAmount) : '—'}
+                </td>
+              </tr>
+
+              {/* SST */}
+              <tr className="border-b border-gray-100">
+                <td className="px-4 py-2 text-gray-600">SST (Commercial)</td>
+                <td></td>
+                <td className="px-4 py-2 text-right">
+                  <div className="flex items-center justify-end gap-1">
+                    <input type="number" step="any"
+                      className="w-16 text-right border border-gray-200 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-brand-500 disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-default"
+                      value={caForm.sst_pct ?? ''} disabled={readOnly}
+                      onChange={e => setCaField('sst_pct', parseFloat(e.target.value) || 0)}
+                    />
+                    <span className="text-xs text-gray-400">%</span>
+                  </div>
+                </td>
+                <td className="px-4 py-2 text-right font-medium text-gray-800 whitespace-nowrap">
+                  {sstAmount > 0 ? formatRM(sstAmount) : '—'}
+                </td>
+              </tr>
+
+              {/* Total Construction Cost */}
+              <tr className="bg-blue-50 border-t-2 border-blue-200">
+                <td className="px-4 py-2.5 font-bold text-blue-900">Total Construction Cost</td>
+                <td></td>
+                <td></td>
+                <td className="px-4 py-2.5 text-right font-bold text-blue-900 whitespace-nowrap">{formatRM(totalConstructionCost)}</td>
+              </tr>
+
+              {/* TCC PSF */}
+              <tr className="bg-gray-50 border-t border-gray-200">
+                <td className="px-4 py-2 font-medium text-gray-700">TCC PSF (RM)</td>
+                <td className="px-4 py-2 text-right text-xs text-gray-400">{totalArea > 0 ? `${totalArea.toLocaleString()} sqft` : ''}</td>
+                <td></td>
+                <td className="px-4 py-2 text-right font-semibold text-gray-800 whitespace-nowrap">
+                  {tccPsf > 0 ? formatPSF(tccPsf) : '—'}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </Section>
 
       <Section title="Land & Other Costs" skey="land">
-        <N label="Land Area (acres)" field="land_area_acres" />
+        <div className="flex items-center justify-between py-2 border-b border-gray-50">
+          <label className="text-sm text-gray-600">Land Area (acres)</label>
+          <div className="flex items-center gap-1.5 text-sm font-medium text-gray-700 bg-gray-50 border border-gray-200 rounded px-3 py-1 min-w-[7rem] text-right justify-end">
+            {caForm.land_area_acres > 0 ? caForm.land_area_acres : '—'}
+          </div>
+        </div>
         <N label="Land Cost PSF" field="land_cost_psf" />
         <N label="Conversion Premium %" field="land_conversion_prem_pct" pct />
         <N label="Quit Rent (RM/yr)" field="quit_rent_pa" />

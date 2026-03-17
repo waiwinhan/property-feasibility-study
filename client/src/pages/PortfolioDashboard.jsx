@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react'
 import { useQuery, useQueries, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { Plus, FolderOpen, TrendingUp, DollarSign, BarChart2, Search, Upload, Trash2, RotateCcw, ChevronDown, ChevronUp, Pencil } from 'lucide-react'
+import { Plus, FolderOpen, TrendingUp, DollarSign, BarChart2, Search, Upload, Trash2, RotateCcw, ChevronDown, ChevronUp, Pencil, MessageSquare } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, ReferenceLine } from 'recharts'
 import { projectsApi, phasesApi } from '../api/projects'
 import { formatRM, formatPct, statusColor, marginColor, cn } from '../lib/utils'
@@ -154,6 +154,10 @@ export default function PortfolioDashboard() {
     updateMut.mutate({ id, data: { name } })
   }
 
+  function handleRemark(id, description) {
+    updateMut.mutate({ id, data: { description } })
+  }
+
   // Grouped view for "All" tab
   const groupedByStatus = STATUS_ORDER.map(status => ({
     status,
@@ -167,6 +171,7 @@ export default function PortfolioDashboard() {
     onStatusChange: handleStatusChange,
     onDateChange: handleDateChange,
     onRename: handleRename,
+    onRemark: handleRemark,
   })
 
   return (
@@ -408,11 +413,14 @@ export default function PortfolioDashboard() {
   )
 }
 
-function ProjectCard({ project, onClick, onDelete, onStatusChange, onDateChange, onRename }) {
+function ProjectCard({ project, onClick, onDelete, onStatusChange, onDateChange, onRename, onRemark }) {
   const margin = project.profit_margin_pct
   const [editingName, setEditingName] = useState(false)
   const [nameInput, setNameInput] = useState('')
   const nameRef = useRef(null)
+  const [editingRemark, setEditingRemark] = useState(false)
+  const [remarkInput, setRemarkInput] = useState('')
+  const remarkRef = useRef(null)
 
   function startEdit(e) {
     e.stopPropagation()
@@ -425,6 +433,19 @@ function ProjectCard({ project, onClick, onDelete, onStatusChange, onDateChange,
     const trimmed = nameInput.trim()
     if (trimmed && trimmed !== project.name) onRename(project.id, trimmed)
     setEditingName(false)
+  }
+
+  function startRemark(e) {
+    e.stopPropagation()
+    setRemarkInput(project.description || '')
+    setEditingRemark(true)
+    setTimeout(() => remarkRef.current?.focus(), 0)
+  }
+
+  function saveRemark() {
+    const trimmed = remarkInput.trim()
+    if (trimmed !== (project.description || '').trim()) onRemark(project.id, trimmed || null)
+    setEditingRemark(false)
   }
 
   return (
@@ -507,6 +528,34 @@ function ProjectCard({ project, onClick, onDelete, onStatusChange, onDateChange,
               className="w-full border border-gray-200 rounded-md px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-brand-500 bg-white"
             />
           </div>
+        </div>
+
+        {/* Remarks */}
+        <div className="pt-1 border-t border-gray-100" onClick={e => e.stopPropagation()}>
+          <div className="flex items-center justify-between mb-1">
+            <p className="text-xs text-gray-400 flex items-center gap-1"><MessageSquare className="w-3 h-3" /> Remarks</p>
+            {!editingRemark && (
+              <button onClick={startRemark} className="text-xs text-brand-500 hover:text-brand-700 transition-colors">
+                {project.description ? 'Edit' : '+ Add'}
+              </button>
+            )}
+          </div>
+          {editingRemark ? (
+            <textarea
+              ref={remarkRef}
+              value={remarkInput}
+              onChange={e => setRemarkInput(e.target.value)}
+              onBlur={saveRemark}
+              onKeyDown={e => { if (e.key === 'Escape') setEditingRemark(false) }}
+              rows={3}
+              placeholder="Add remarks or comments…"
+              className="w-full border border-brand-300 rounded-md px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-brand-500 resize-none bg-white"
+            />
+          ) : project.description ? (
+            <p className="text-xs text-gray-600 whitespace-pre-wrap line-clamp-3 cursor-pointer hover:text-gray-900 transition-colors" onClick={startRemark}>{project.description}</p>
+          ) : (
+            <p className="text-xs text-gray-300 italic cursor-pointer" onClick={startRemark}>No remarks</p>
+          )}
         </div>
 
         {project.updated_at && (

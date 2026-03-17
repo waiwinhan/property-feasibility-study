@@ -128,7 +128,7 @@ export default function ProjectOverview() {
             <BarChart2 className="w-4 h-4" /> Dashboard
           </Button>
           <Button variant="secondary" size="sm" onClick={() => navigate(`/project/${id}/study`)}>
-            <FileText className="w-4 h-4" /> Study Editor
+            <FileText className="w-4 h-4" /> Feasibility Study
           </Button>
         </div>
       </div>

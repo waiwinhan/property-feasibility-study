@@ -162,7 +162,12 @@ function calcNDV(gdv, ca) {
  * @returns {object} full financial result
  */
 function calcPhase(unitTypes, ca, sharedPoolsTotal = 0) {
-  const gdv = calcGDV(unitTypes)
+  // selling_psf is entered as NDV PSF; reverse-calculate GDV by adding back deductions
+  const ndvInput = calcGDV(unitTypes)
+  const deductionRate = ((ca.bumi_quota_pct || 30) / 100) * ((ca.bumi_discount_pct || 7) / 100)
+                      + (ca.legal_fees_pct || 0.4) / 100
+                      + (ca.early_bird_pct || 9) / 100
+  const gdv = deductionRate < 1 ? ndvInput / (1 - deductionRate) : ndvInput
   const ndvResult = calcNDV(gdv, ca)
   const ndv = ndvResult.ndv
 
