@@ -386,6 +386,7 @@ function GDVTab({ unitRows, setUnitRow, addRow, removeRow, caForm, setCaField, r
               <th className="px-3 py-2.5 text-right font-medium text-gray-600 w-24">Units</th>
               <th className="px-3 py-2.5 text-right font-medium text-gray-600 w-28">Size (sqft)</th>
               <th className="px-3 py-2.5 text-right font-medium text-gray-600 w-36">NDV PSF (RM)</th>
+              <th className="px-3 py-2.5 text-right font-medium text-gray-600 w-40">Unit Price (RM)</th>
               <th className="px-3 py-2.5 text-right font-medium text-gray-600 w-40">NDV</th>
               <th className="px-2 py-2.5 w-8"></th>
             </tr>
@@ -402,6 +403,7 @@ function GDVTab({ unitRows, setUnitRow, addRow, removeRow, caForm, setCaField, r
                   {catRows.map((row, idx) => {
                     const rowIndex = unitRows.indexOf(row)
                     const ndv = (parseInt(row.unit_count) || 0) * (parseFloat(row.avg_size_sqft) || 0) * (parseFloat(row.selling_psf) || 0)
+                    const unitPrice = (parseFloat(row.avg_size_sqft) || 0) * (parseFloat(row.selling_psf) || 0)
                     return (
                       <tr key={`${cat}-${idx}`} className="hover:bg-gray-50 group">
                         <td className="px-3 py-2">
@@ -446,6 +448,9 @@ function GDVTab({ unitRows, setUnitRow, addRow, removeRow, caForm, setCaField, r
                           </div>
                         </td>
                         <td className="px-3 py-2 text-right text-gray-600 font-medium whitespace-nowrap">
+                          {unitPrice > 0 ? formatRM(unitPrice) : '—'}
+                        </td>
+                        <td className="px-3 py-2 text-right text-gray-600 font-medium whitespace-nowrap">
                           {ndv > 0 ? formatRM(ndv) : '—'}
                         </td>
                         <td className="px-2 py-2">
@@ -464,6 +469,7 @@ function GDVTab({ unitRows, setUnitRow, addRow, removeRow, caForm, setCaField, r
                     <td className="px-3 py-2 text-right text-sm font-semibold text-gray-700">{subtotal.units.toLocaleString()}</td>
                     <td className="px-3 py-2 text-right text-sm font-semibold text-gray-700">{subtotal.netArea.toLocaleString()}</td>
                     <td></td>
+                    <td></td>
                     <td className="px-3 py-2 text-right text-sm font-bold text-gray-800 whitespace-nowrap">{formatRM(subtotal.ndv)}</td>
                     <td></td>
                   </tr>
@@ -476,6 +482,7 @@ function GDVTab({ unitRows, setUnitRow, addRow, removeRow, caForm, setCaField, r
               <td colSpan={2} className="px-3 py-2.5 text-sm font-bold text-gray-900">Grand Total</td>
               <td className="px-3 py-2.5 text-right text-sm font-bold text-gray-900">{grandTotal.units.toLocaleString()}</td>
               <td className="px-3 py-2.5 text-right text-sm font-bold text-gray-900">{grandTotal.netArea.toLocaleString()}</td>
+              <td></td>
               <td></td>
               <td className="px-3 py-2.5 text-right text-sm font-bold text-gray-900 whitespace-nowrap">{formatRM(grandTotal.ndv)}</td>
               <td></td>
