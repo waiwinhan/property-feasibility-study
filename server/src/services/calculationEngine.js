@@ -20,10 +20,18 @@ function calculatePhase(unitTypes = [], costAssumptions = {}, allocationAmounts 
   const netSellingPSF = totalNFA > 0 ? ndv / totalNFA : 0
 
   // ── GDV deductions ────────────────────────────────────────────────────────
-  const bumiDiscount = (ca.bumi_discount_pct || 0) / 100 * (ca.bumi_quota_pct || 0) / 100 * ndv
-  const legalFees = (ca.legal_fees_pct || 0) / 100 * ndv
-  const earlyBird = (ca.early_bird_pct || 0) / 100 * ndv
-  const totalDeductions = bumiDiscount + legalFees + earlyBird
+  const bumiDiscount          = (ca.bumi_discount_pct || 0) / 100 * (ca.bumi_quota_pct || 0) / 100 * ndv
+  const vipDiscount           = (ca.vip_discount_pct            || 0) / 100 * ndv
+  const additionalSalesPkg    = (ca.additional_sales_pkg_pct    || 0) / 100 * ndv
+  const commissionBrokerage   = (ca.commission_brokerage_pct    || 0) / 100 * ndv
+  const repeatBuyers          = (ca.repeat_buyers_pct           || 0) / 100 * ndv
+  const spaLegalFees          = (ca.spa_legal_fees_per_unit     || 0) * totalUnits
+  const directorStaffDiscount = (ca.director_staff_discount_pct || 0) / 100 * ndv
+  const bumiPenalty           = (ca.bumi_penalty_per_unit       || 0) * totalUnits
+  const maintenanceFund       = totalNFA * 12 * (ca.maintenance_fund_rate_psf || 0)
+  const totalDeductions = bumiDiscount + vipDiscount + additionalSalesPkg + commissionBrokerage
+                        + repeatBuyers + spaLegalFees + directorStaffDiscount + bumiPenalty
+                        + maintenanceFund
 
   // GDV back-calculated: NDV is net after deductions, so GDV = NDV + deductions
   const gdv = ndv + totalDeductions
@@ -122,7 +130,8 @@ function calculatePhase(unitTypes = [], costAssumptions = {}, allocationAmounts 
     // Revenue
     ndv, gdv, netSellingPSF, totalNFA, totalUnits,
     // Deductions
-    bumiDiscount, legalFees, earlyBird, totalDeductions,
+    bumiDiscount, vipDiscount, additionalSalesPkg, commissionBrokerage, repeatBuyers,
+    spaLegalFees, directorStaffDiscount, bumiPenalty, maintenanceFund, totalDeductions,
     // Construction
     buildingWorkResidential, buildingWorkAffordable, buildingWorkCommercial,
     buildingWork, infrastructureTotal, cc,

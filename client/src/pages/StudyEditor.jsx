@@ -345,6 +345,24 @@ function PhaseHeader({ phase, onSave, readOnly, saveRef, onLandAreaChange }) {
   )
 }
 
+function DeductionRow({ label, field, suffix, caForm, setCaField, readOnly }) {
+  return (
+    <div className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
+      <label className="text-sm text-gray-600">{label}</label>
+      <div className="flex items-center gap-1.5">
+        <input
+          type="number" step="any" min="0"
+          className="w-28 text-right border border-gray-200 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-brand-500 disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-default"
+          value={caForm?.[field] ?? ''}
+          disabled={readOnly}
+          onChange={e => setCaField(field, parseFloat(e.target.value) || 0)}
+        />
+        <span className="text-xs text-gray-400 w-24">{suffix}</span>
+      </div>
+    </div>
+  )
+}
+
 function GDVTab({ unitRows, setUnitRow, addRow, removeRow, caForm, setCaField, readOnly }) {
   const hasBumiApplicableUnits = unitRows.some(row => BUMI_APPLICABLE_CATEGORIES.includes(row.category))
 
@@ -493,30 +511,22 @@ function GDVTab({ unitRows, setUnitRow, addRow, removeRow, caForm, setCaField, r
 
       {/* GDV Deductions */}
       <div className="rounded-lg border border-gray-200 overflow-hidden">
-        <div className="px-4 py-3 bg-gray-50 text-sm font-semibold text-gray-700 border-b border-gray-200">GDV Deductions</div>
+        <div className="px-4 py-3 bg-gray-50 text-sm font-semibold text-gray-700 border-b border-gray-200">Selling Expenses</div>
         <div className="px-4 py-1">
-          {[
-            ...hasBumiApplicableUnits ? [
-              { label: 'Bumi Quota %', field: 'bumi_quota_pct' },
-              { label: 'Bumi Discount %', field: 'bumi_discount_pct' },
-            ] : [],
-            { label: 'Legal Fees %', field: 'legal_fees_pct' },
-            { label: 'Discount / Rebate %', field: 'early_bird_pct' },
-          ].map(({ label, field }) => (
-            <div key={field} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
-              <label className="text-sm text-gray-600">{label}</label>
-              <div className="flex items-center gap-1">
-                <input
-                  type="number" step="any"
-                  className="w-24 text-right border border-gray-200 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-brand-500 disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-default"
-                  value={caForm?.[field] ?? ''}
-                  disabled={readOnly}
-                  onChange={e => setCaField(field, parseFloat(e.target.value) || 0)}
-                />
-                <span className="text-xs text-gray-400">%</span>
-              </div>
-            </div>
-          ))}
+          {hasBumiApplicableUnits && (
+            <>
+              <DeductionRow label="Bumi Quota %" field="bumi_quota_pct" suffix="%" caForm={caForm} setCaField={setCaField} readOnly={readOnly} />
+              <DeductionRow label="Bumi Discount %" field="bumi_discount_pct" suffix="%" caForm={caForm} setCaField={setCaField} readOnly={readOnly} />
+            </>
+          )}
+          <DeductionRow label="VIP Discount / Early Bird Rebate" field="vip_discount_pct" suffix="% of GDV" caForm={caForm} setCaField={setCaField} readOnly={readOnly} />
+          <DeductionRow label="Additional Sales Package" field="additional_sales_pkg_pct" suffix="% of NDV" caForm={caForm} setCaField={setCaField} readOnly={readOnly} />
+          <DeductionRow label="Commission & Brokerage" field="commission_brokerage_pct" suffix="% of NDV" caForm={caForm} setCaField={setCaField} readOnly={readOnly} />
+          <DeductionRow label="Repeat Buyers / BGB" field="repeat_buyers_pct" suffix="% of NDV" caForm={caForm} setCaField={setCaField} readOnly={readOnly} />
+          <DeductionRow label="Free SPA & Loan Legal Fees" field="spa_legal_fees_per_unit" suffix="RM / unit" caForm={caForm} setCaField={setCaField} readOnly={readOnly} />
+          <DeductionRow label="Director / Staff Discount" field="director_staff_discount_pct" suffix="% of NDV" caForm={caForm} setCaField={setCaField} readOnly={readOnly} />
+          <DeductionRow label="Bumi Penalty" field="bumi_penalty_per_unit" suffix="RM / unit" caForm={caForm} setCaField={setCaField} readOnly={readOnly} />
+          <DeductionRow label="Maintenance & Sinking Fund (12 mth)" field="maintenance_fund_rate_psf" suffix="RM / sqft / mth" caForm={caForm} setCaField={setCaField} readOnly={readOnly} />
         </div>
       </div>
     </div>
@@ -938,9 +948,15 @@ function FinancialSummary({ results }) {
 
   const rows = [
     { label: 'GDV', value: r.gdv, highlight: false },
-    { label: 'Bumi Deduction', value: r.ndvResult?.bumiDeduction, neg: true },
-    { label: 'Legal Fees', value: r.ndvResult?.legalFees, neg: true },
-    { label: 'Discount / Rebate', value: r.ndvResult?.earlyBird, neg: true },
+    { label: 'Bumi Deduction', value: r.bumiDiscount, neg: true },
+    { label: 'VIP Discount / Early Bird', value: r.vipDiscount, neg: true },
+    { label: 'Additional Sales Package', value: r.additionalSalesPkg, neg: true },
+    { label: 'Commission & Brokerage', value: r.commissionBrokerage, neg: true },
+    { label: 'Repeat Buyers / BGB', value: r.repeatBuyers, neg: true },
+    { label: 'SPA & Loan Legal Fees', value: r.spaLegalFees, neg: true },
+    { label: 'Director / Staff Discount', value: r.directorStaffDiscount, neg: true },
+    { label: 'Bumi Penalty', value: r.bumiPenalty, neg: true },
+    { label: 'Maintenance & Sinking Fund', value: r.maintenanceFund, neg: true },
     { label: 'NDV', value: r.ndv, highlight: true, bold: true, divider: true },
     { label: 'Land Cost', value: r.landResult?.totalLand, neg: true },
     { label: 'GCC', value: r.gcc, neg: true },
