@@ -345,19 +345,22 @@ function PhaseHeader({ phase, onSave, readOnly, saveRef, onLandAreaChange }) {
   )
 }
 
-function DeductionRow({ label, field, suffix, caForm, setCaField, readOnly }) {
+function DeductionRow({ label, field, suffix, caForm, setCaField, readOnly, amount }) {
   return (
-    <div className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
-      <label className="text-sm text-gray-600">{label}</label>
-      <div className="flex items-center gap-1.5">
+    <div className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0 gap-2">
+      <label className="text-sm text-gray-600 flex-1">{label}</label>
+      <div className="flex items-center gap-1.5 shrink-0">
         <input
           type="number" step="any" min="0"
-          className="w-28 text-right border border-gray-200 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-brand-500 disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-default"
+          className="w-24 text-right border border-gray-200 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-brand-500 disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-default"
           value={caForm?.[field] ?? ''}
           disabled={readOnly}
           onChange={e => setCaField(field, parseFloat(e.target.value) || 0)}
         />
-        <span className="text-xs text-gray-400 w-24">{suffix}</span>
+        <span className="text-xs text-gray-400 w-28">{suffix}</span>
+        <span className="text-sm font-medium text-gray-700 w-32 text-right whitespace-nowrap">
+          {amount > 0 ? formatRM(amount) : '—'}
+        </span>
       </div>
     </div>
   )
@@ -387,7 +390,19 @@ function GDVTab({ unitRows, setUnitRow, addRow, removeRow, caForm, setCaField, r
 
   // Calculate grand total
   const grandTotal = calculateSubtotal(unitRows)
-  
+  const { units: totalUnits, netArea: totalNFA, ndv } = grandTotal
+
+  // Pre-compute selling expense amounts for live display
+  const sellingAmounts = {
+    vip_discount_pct:            (caForm.vip_discount_pct            || 0) / 100 * ndv,
+    additional_sales_pkg_pct:    (caForm.additional_sales_pkg_pct    || 0) / 100 * ndv,
+    commission_brokerage_pct:    (caForm.commission_brokerage_pct    || 0) / 100 * ndv,
+    repeat_buyers_pct:           (caForm.repeat_buyers_pct           || 0) / 100 * ndv,
+    spa_legal_fees_per_unit:     (caForm.spa_legal_fees_per_unit     || 0) * totalUnits,
+    director_staff_discount_pct: (caForm.director_staff_discount_pct || 0) / 100 * ndv,
+    maintenance_fund_rate_psf:   totalNFA * 12 * (caForm.maintenance_fund_rate_psf || 0),
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -519,13 +534,13 @@ function GDVTab({ unitRows, setUnitRow, addRow, removeRow, caForm, setCaField, r
               <DeductionRow label="Bumi Discount %" field="bumi_discount_pct" suffix="%" caForm={caForm} setCaField={setCaField} readOnly={readOnly} />
             </>
           )}
-          <DeductionRow label="VIP Discount / Early Bird Rebate" field="vip_discount_pct" suffix="% of GDV" caForm={caForm} setCaField={setCaField} readOnly={readOnly} />
-          <DeductionRow label="Additional Sales Package" field="additional_sales_pkg_pct" suffix="% of NDV" caForm={caForm} setCaField={setCaField} readOnly={readOnly} />
-          <DeductionRow label="Commission & Brokerage" field="commission_brokerage_pct" suffix="% of NDV" caForm={caForm} setCaField={setCaField} readOnly={readOnly} />
-          <DeductionRow label="Repeat Buyers / BGB" field="repeat_buyers_pct" suffix="% of NDV" caForm={caForm} setCaField={setCaField} readOnly={readOnly} />
-          <DeductionRow label="Free SPA & Loan Legal Fees" field="spa_legal_fees_per_unit" suffix="RM / unit" caForm={caForm} setCaField={setCaField} readOnly={readOnly} />
-          <DeductionRow label="Director / Staff Discount" field="director_staff_discount_pct" suffix="% of NDV" caForm={caForm} setCaField={setCaField} readOnly={readOnly} />
-<DeductionRow label="Maintenance & Sinking Fund (12 mth)" field="maintenance_fund_rate_psf" suffix="RM / sqft / mth" caForm={caForm} setCaField={setCaField} readOnly={readOnly} />
+          <DeductionRow label="VIP Discount / Early Bird Rebate" field="vip_discount_pct" suffix="% of GDV" caForm={caForm} setCaField={setCaField} readOnly={readOnly} amount={sellingAmounts.vip_discount_pct} />
+          <DeductionRow label="Additional Sales Package" field="additional_sales_pkg_pct" suffix="% of NDV" caForm={caForm} setCaField={setCaField} readOnly={readOnly} amount={sellingAmounts.additional_sales_pkg_pct} />
+          <DeductionRow label="Commission & Brokerage" field="commission_brokerage_pct" suffix="% of NDV" caForm={caForm} setCaField={setCaField} readOnly={readOnly} amount={sellingAmounts.commission_brokerage_pct} />
+          <DeductionRow label="Repeat Buyers / BGB" field="repeat_buyers_pct" suffix="% of NDV" caForm={caForm} setCaField={setCaField} readOnly={readOnly} amount={sellingAmounts.repeat_buyers_pct} />
+          <DeductionRow label="Free SPA & Loan Legal Fees" field="spa_legal_fees_per_unit" suffix="RM / unit" caForm={caForm} setCaField={setCaField} readOnly={readOnly} amount={sellingAmounts.spa_legal_fees_per_unit} />
+          <DeductionRow label="Director / Staff Discount" field="director_staff_discount_pct" suffix="% of NDV" caForm={caForm} setCaField={setCaField} readOnly={readOnly} amount={sellingAmounts.director_staff_discount_pct} />
+          <DeductionRow label="Maintenance & Sinking Fund (12 mth)" field="maintenance_fund_rate_psf" suffix="RM / sqft / mth" caForm={caForm} setCaField={setCaField} readOnly={readOnly} amount={sellingAmounts.maintenance_fund_rate_psf} />
         </div>
       </div>
     </div>
@@ -552,6 +567,10 @@ function CostsTab({ caForm, setCaField, projectId, readOnly, unitRows = [] }) {
   })
   const toggle = (k) => setExpanded(prev => ({ ...prev, [k]: !prev[k] }))
 
+  // Unit / area totals derived from Section A
+  const totalUnits = unitRows.reduce((s, r) => s + (parseInt(r.unit_count) || 0), 0)
+  const totalNFA   = residentialArea + affordableArea + commercialArea
+
   // Construction cost calculations (mirrors server calcGCC logic)
   const totalBuildingCost = residentialArea * (caForm.building_psf_residential || 0)
                           + affordableArea  * (caForm.building_psf_affordable  || 0)
@@ -564,11 +583,33 @@ function CostsTab({ caForm, setCaField, projectId, readOnly, unitRows = [] }) {
   const totalConstructionCost = totalBuildingCost + infrastructureCost + prelimAmount + contingencyAmount + sstAmount
   const totalArea          = residentialArea + affordableArea + commercialArea
   const tccPsf             = totalArea > 0 ? totalConstructionCost / totalArea : 0
+  const ndv                = unitRows.reduce((s, r) => s + (parseInt(r.unit_count)||0) * (parseFloat(r.avg_size_sqft)||0) * (parseFloat(r.selling_psf)||0), 0)
 
-  const N = ({ label, field, pct, decimals = 2 }) => (
-    <div className="flex items-center justify-between py-2 border-b border-gray-50">
-      <label className="text-sm text-gray-600">{label}</label>
-      <div className="flex items-center gap-1">
+  // Pre-computed RM amounts for each cost input
+  const landCostAmt             = (caForm.land_area_acres || 0) * (caForm.land_cost_psf || 0) * 43560
+  const conversionPremiumAmt    = (caForm.land_conversion_prem_pct || 0) / 100 * landCostAmt
+  const quitRentAmt             = (caForm.quit_rent_pa || 0) * (caForm.quit_rent_years || 0)
+  const assessmentAmt           = (caForm.assessment_pa || 0) * (caForm.assessment_years || 0)
+  const strataTitleAmt          = (caForm.strata_title_per_unit || 0) * totalUnits
+  const planningFeesAmt         = (caForm.planning_fees_per_unit || 0) * totalUnits
+  const devChargesAmt           = (caForm.dev_charges_pct || 0) / 100 * ndv
+  const syabasAmt               = (caForm.syabas_pct || 0) / 100 * ndv
+  const iwkJpsAmt               = (caForm.iwk_jps_pct || 0) / 100 * ndv
+  const tnbAmt                  = (caForm.tnb_per_unit || 0) * totalUnits
+  const tmFibreAmt              = (caForm.tm_fibre_per_unit || 0) * totalUnits
+  const roadDrainageAmt         = (caForm.road_drainage_per_acre || 0) * (caForm.land_area_acres || 0)
+  const professionalFeesAmt     = (caForm.professional_fees_pct || 0) / 100 * totalConstructionCost
+  const siteAdminAmt            = (caForm.site_admin_pct || 0) / 100 * totalConstructionCost
+  const marketingAmt            = (caForm.marketing_pct || 0) / 100 * ndv
+  const overheadProjectDeptAmt  = (caForm.overhead_project_dept_pct || 0) / 100 * ndv
+  const overheadHqAmt           = (caForm.overhead_hq_pct || 0) / 100 * ndv
+  const overheadMarketingAmt    = (caForm.overhead_marketing_pct || 0) / 100 * ndv
+  const overheadCorporateAmt    = (caForm.overhead_corporate_pct || 0) / 100 * ndv
+
+  const N = ({ label, field, pct, decimals = 2, amount }) => (
+    <div className="flex items-center justify-between py-2 border-b border-gray-50 gap-2">
+      <label className="text-sm text-gray-600 flex-1">{label}</label>
+      <div className="flex items-center gap-1.5 shrink-0">
         <input
           type="number" step="any"
           className="w-24 text-right border border-gray-200 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-brand-500 disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-default"
@@ -577,6 +618,11 @@ function CostsTab({ caForm, setCaField, projectId, readOnly, unitRows = [] }) {
           onChange={e => setCaField(field, parseFloat(e.target.value) || 0)}
         />
         {pct && <span className="text-xs text-gray-400">%</span>}
+        {amount != null && (
+          <span className="text-sm font-medium text-gray-700 w-32 text-right whitespace-nowrap">
+            {amount > 0 ? formatRM(amount) : '—'}
+          </span>
+        )}
       </div>
     </div>
   )
@@ -785,34 +831,34 @@ function CostsTab({ caForm, setCaField, projectId, readOnly, unitRows = [] }) {
             {caForm.land_area_acres > 0 ? caForm.land_area_acres : '—'}
           </div>
         </div>
-        <N label="Land Cost PSF" field="land_cost_psf" />
-        <N label="Conversion Premium %" field="land_conversion_prem_pct" pct />
+        <N label="Land Cost PSF" field="land_cost_psf" amount={landCostAmt} />
+        <N label="Conversion Premium %" field="land_conversion_prem_pct" pct amount={conversionPremiumAmt} />
         <N label="Quit Rent (RM/yr)" field="quit_rent_pa" />
-        <N label="Quit Rent Years" field="quit_rent_years" />
+        <N label="Quit Rent Years" field="quit_rent_years" amount={quitRentAmt} />
         <N label="Assessment (RM/yr)" field="assessment_pa" />
-        <N label="Assessment Years" field="assessment_years" />
+        <N label="Assessment Years" field="assessment_years" amount={assessmentAmt} />
       </Section>
 
       <Section title="Statutory Fees" skey="statutory">
-        <N label="Strata Title / unit" field="strata_title_per_unit" />
-        <N label="Planning Fees / unit" field="planning_fees_per_unit" />
+        <N label="Strata Title / unit" field="strata_title_per_unit" amount={strataTitleAmt} />
+        <N label="Planning Fees / unit" field="planning_fees_per_unit" amount={planningFeesAmt} />
       </Section>
 
       <Section title="Authority Contributions" skey="authority">
-        <N label="Dev Charges %" field="dev_charges_pct" pct />
-        <N label="SYABAS %" field="syabas_pct" pct />
-        <N label="IWK & JPS %" field="iwk_jps_pct" pct />
-        <N label="TNB / unit" field="tnb_per_unit" />
-        <N label="TM Fibre / unit" field="tm_fibre_per_unit" />
-        <N label="Road & Drainage / acre" field="road_drainage_per_acre" />
-        <N label="School Contribution (lump)" field="school_contrib_lump" />
-        <N label="ISF (lump)" field="isf_lump" />
+        <N label="Dev Charges %" field="dev_charges_pct" pct amount={devChargesAmt} />
+        <N label="SYABAS %" field="syabas_pct" pct amount={syabasAmt} />
+        <N label="IWK & JPS %" field="iwk_jps_pct" pct amount={iwkJpsAmt} />
+        <N label="TNB / unit" field="tnb_per_unit" amount={tnbAmt} />
+        <N label="TM Fibre / unit" field="tm_fibre_per_unit" amount={tmFibreAmt} />
+        <N label="Road & Drainage / acre" field="road_drainage_per_acre" amount={roadDrainageAmt} />
+        <N label="School Contribution (lump)" field="school_contrib_lump" amount={caForm.school_contrib_lump || 0} />
+        <N label="ISF (lump)" field="isf_lump" amount={caForm.isf_lump || 0} />
       </Section>
 
       <Section title="Professional & Marketing Fees" skey="professional">
-        <N label="Professional Fees %" field="professional_fees_pct" pct />
-        <N label="Site Admin %" field="site_admin_pct" pct />
-        <N label="Marketing %" field="marketing_pct" pct />
+        <N label="Professional Fees %" field="professional_fees_pct" pct amount={professionalFeesAmt} />
+        <N label="Site Admin %" field="site_admin_pct" pct amount={siteAdminAmt} />
+        <N label="Marketing %" field="marketing_pct" pct amount={marketingAmt} />
       </Section>
 
       <Section title="Finance Charges" skey="finance">
@@ -824,10 +870,10 @@ function CostsTab({ caForm, setCaField, projectId, readOnly, unitRows = [] }) {
       </Section>
 
       <Section title="Overheads" skey="overheads">
-        <N label="Project Dept %" field="overhead_project_dept_pct" pct />
-        <N label="Head Office %" field="overhead_hq_pct" pct />
-        <N label="Marketing Dept %" field="overhead_marketing_pct" pct />
-        <N label="Corporate %" field="overhead_corporate_pct" pct />
+        <N label="Project Dept %" field="overhead_project_dept_pct" pct amount={overheadProjectDeptAmt} />
+        <N label="Head Office %" field="overhead_hq_pct" pct amount={overheadHqAmt} />
+        <N label="Marketing Dept %" field="overhead_marketing_pct" pct amount={overheadMarketingAmt} />
+        <N label="Corporate %" field="overhead_corporate_pct" pct amount={overheadCorporateAmt} />
       </Section>
     </div>
   )
