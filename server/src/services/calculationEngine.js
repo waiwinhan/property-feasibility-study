@@ -27,11 +27,9 @@ function calculatePhase(unitTypes = [], costAssumptions = {}, allocationAmounts 
   const repeatBuyers          = (ca.repeat_buyers_pct           || 0) / 100 * ndv
   const spaLegalFees          = (ca.spa_legal_fees_per_unit     || 0) * totalUnits
   const directorStaffDiscount = (ca.director_staff_discount_pct || 0) / 100 * ndv
-  const bumiPenalty           = (ca.bumi_penalty_per_unit       || 0) * totalUnits
   const maintenanceFund       = totalNFA * 12 * (ca.maintenance_fund_rate_psf || 0)
   const totalDeductions = bumiDiscount + vipDiscount + additionalSalesPkg + commissionBrokerage
-                        + repeatBuyers + spaLegalFees + directorStaffDiscount + bumiPenalty
-                        + maintenanceFund
+                        + repeatBuyers + spaLegalFees + directorStaffDiscount + maintenanceFund
 
   // GDV back-calculated: NDV is net after deductions, so GDV = NDV + deductions
   const gdv = ndv + totalDeductions
@@ -131,7 +129,7 @@ function calculatePhase(unitTypes = [], costAssumptions = {}, allocationAmounts 
     ndv, gdv, netSellingPSF, totalNFA, totalUnits,
     // Deductions
     bumiDiscount, vipDiscount, additionalSalesPkg, commissionBrokerage, repeatBuyers,
-    spaLegalFees, directorStaffDiscount, bumiPenalty, maintenanceFund, totalDeductions,
+    spaLegalFees, directorStaffDiscount, maintenanceFund, totalDeductions,
     // Construction
     buildingWorkResidential, buildingWorkAffordable, buildingWorkCommercial,
     buildingWork, infrastructureTotal, cc,

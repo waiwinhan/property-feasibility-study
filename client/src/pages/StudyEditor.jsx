@@ -525,8 +525,7 @@ function GDVTab({ unitRows, setUnitRow, addRow, removeRow, caForm, setCaField, r
           <DeductionRow label="Repeat Buyers / BGB" field="repeat_buyers_pct" suffix="% of NDV" caForm={caForm} setCaField={setCaField} readOnly={readOnly} />
           <DeductionRow label="Free SPA & Loan Legal Fees" field="spa_legal_fees_per_unit" suffix="RM / unit" caForm={caForm} setCaField={setCaField} readOnly={readOnly} />
           <DeductionRow label="Director / Staff Discount" field="director_staff_discount_pct" suffix="% of NDV" caForm={caForm} setCaField={setCaField} readOnly={readOnly} />
-          <DeductionRow label="Bumi Penalty" field="bumi_penalty_per_unit" suffix="RM / unit" caForm={caForm} setCaField={setCaField} readOnly={readOnly} />
-          <DeductionRow label="Maintenance & Sinking Fund (12 mth)" field="maintenance_fund_rate_psf" suffix="RM / sqft / mth" caForm={caForm} setCaField={setCaField} readOnly={readOnly} />
+<DeductionRow label="Maintenance & Sinking Fund (12 mth)" field="maintenance_fund_rate_psf" suffix="RM / sqft / mth" caForm={caForm} setCaField={setCaField} readOnly={readOnly} />
         </div>
       </div>
     </div>
@@ -955,7 +954,6 @@ function FinancialSummary({ results }) {
     { label: 'Repeat Buyers / BGB', value: r.repeatBuyers, neg: true },
     { label: 'SPA & Loan Legal Fees', value: r.spaLegalFees, neg: true },
     { label: 'Director / Staff Discount', value: r.directorStaffDiscount, neg: true },
-    { label: 'Bumi Penalty', value: r.bumiPenalty, neg: true },
     { label: 'Maintenance & Sinking Fund', value: r.maintenanceFund, neg: true },
     { label: 'NDV', value: r.ndv, highlight: true, bold: true, divider: true },
     { label: 'Land Cost', value: r.landResult?.totalLand, neg: true },
