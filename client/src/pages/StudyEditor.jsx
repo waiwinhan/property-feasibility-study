@@ -32,6 +32,9 @@ const DEFAULT_CA = {
   finance_rate_pct: 4.55, land_loan_pct: 70, land_loan_years: 4,
   construction_loan_pct: 20, construction_loan_years: 4,
   bumi_discount_pct: 7, bumi_quota_pct: 30, legal_fees_pct: 0.4, early_bird_pct: 9,
+  vip_discount_pct: 9, additional_sales_pkg_pct: 0.5, commission_brokerage_pct: 2,
+  repeat_buyers_pct: 0.2, spa_legal_fees_per_unit: 5500, director_staff_discount_pct: 0.15,
+  maintenance_fund_rate_psf: 0.70,
   overhead_project_dept_pct: 1.4, overhead_hq_pct: 3, overhead_marketing_pct: 0.5, overhead_corporate_pct: 1,
 }
 
@@ -1002,15 +1005,15 @@ function FinancialSummary({ results }) {
     { label: 'Director / Staff Discount', value: r.directorStaffDiscount, neg: true },
     { label: 'Maintenance & Sinking Fund', value: r.maintenanceFund, neg: true },
     { label: 'NDV', value: r.ndv, highlight: true, bold: true, divider: true },
-    { label: 'Land Cost', value: r.landResult?.totalLand, neg: true },
+    { label: 'Land Cost', value: r.landRelated, neg: true },
     { label: 'GCC', value: r.gcc, neg: true },
-    { label: 'Statutory', value: r.statutory?.total, neg: true },
-    { label: 'Authority', value: r.authority?.total, neg: true },
-    { label: 'Professional', value: r.professional?.total, neg: true },
-    { label: 'Marketing', value: r.marketing?.total, neg: true },
-    { label: 'Finance', value: r.finance?.total, neg: true },
-    { label: 'Overheads', value: r.overheads?.total, neg: true },
-    { label: 'Total GDC', value: r.totalGDC, neg: true, bold: true, divider: true },
+    { label: 'Statutory', value: (r.strataTitleFees || 0) + (r.planningFees || 0), neg: true },
+    { label: 'Authority', value: r.authorityContribs, neg: true },
+    { label: 'Professional', value: (r.professionalFees || 0) + (r.siteAdmin || 0), neg: true },
+    { label: 'Marketing', value: r.marketing, neg: true },
+    { label: 'Finance', value: r.financialCharges, neg: true },
+    { label: 'Overheads', value: r.totalOverhead, neg: true },
+    { label: 'Total GDC', value: r.gdcAfterFinance, neg: true, bold: true, divider: true },
     { label: 'NDP', value: r.ndp, highlight: true, bold: true, divider: true },
   ]
 
@@ -1024,9 +1027,9 @@ function FinancialSummary({ results }) {
           { label: 'NDV', value: formatRM(r.ndv) },
           { label: 'NDP', value: formatRM(r.ndp) },
           { label: 'Margin', value: formatPct(margin), color: marginColor(margin) },
-          { label: 'Const PSF', value: formatPSF(r.constPsf) },
+          { label: 'Const PSF', value: formatPSF(r.constructionCostPSF) },
           { label: 'Units', value: r.totalUnits },
-          { label: 'Net PSF', value: formatPSF(r.netSellingPsf) },
+          { label: 'Net PSF', value: formatPSF(r.netSellingPSF) },
         ].map(({ label, value, color }) => (
           <div key={label} className="bg-white rounded-lg p-2 border border-gray-100">
             <div className="text-xs text-gray-400">{label}</div>
